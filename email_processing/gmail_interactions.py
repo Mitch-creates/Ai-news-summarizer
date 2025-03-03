@@ -5,7 +5,7 @@ from email.utils import parseaddr
 from googleapiclient.discovery import build
 from blog.blogpost_creator import create_blogpost
 from dotenv import load_dotenv
-from entity.Email import Email  # Adjust the import path as necessary
+from entities.Email import Email  # Adjust the import path as necessary
 from enums.gmail_labels import GmailLabels  # Adjust the import path as necessary
 
 # Load environment variables

@@ -31,8 +31,8 @@ def create_table(conn):
 
 def insert_email(conn, email):
     """Insert a new email summary into the emails table."""
-    sql = '''INSERT INTO emails(sender, subject, body, summary)
-             VALUES(?, ?, ?, ?)'''
+    sql = '''INSERT INTO emails(sender_name, date, subject, body, sender_email, unique_id, published)
+             VALUES(?, ?, ?, ?, ?, ?, ?)'''
     cursor = conn.cursor()
     cursor.execute(sql, email)
     conn.commit()
