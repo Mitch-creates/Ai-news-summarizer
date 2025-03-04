@@ -1,8 +1,9 @@
 from googleapiclient.discovery import build
 from auth.gmail_auth import authenticate_gmail  # Import your authentication function
 from email_processing.gmail_interactions import fetch_emails
-from database.db_operations import create_connection, create_table, insert_email
+from database.db_operations import create_connection, create_table, insert_email, get_all_emails, check_if_email_exists
 from enums.newsletters import Newsletters
+from blog.blogpost_creator import create_blogpost
 
 def main():
     # Step 1: Authenticate with Gmail
@@ -29,18 +30,28 @@ def main():
             sender_email = email.sender_email  # Extract sender email
             unique_id = email.unique_id  # Extract unique email ID
 
-            email_data = (sender, date, subject, body, sender_email, unique_id, False)
-            insert_email(conn, email_data)
+            # Check if the email already exists in the database
+            if not check_if_email_exists(conn, unique_id):
+                email_data = (sender, date, subject, body, sender_email, unique_id, False)
+                insert_email(conn, email_data)
+                print(f"Inserted email from {sender} with subject '{subject}' into the database.")
+            else:
+                print(f"Email from {sender} with subject '{subject}' already exists in the database.")
 
-            # Print results
-            print(f"Sender: {sender}\n")
-            print("Original Email Body:\n")
-            print(email.body)
-            print("\n" + "="*50 + "\n")
+        # Fetch and print all emails from the database
+        all_emails = get_all_emails(conn)
+        for row in all_emails:
+            print(f"ID: {row[0]}, Sender: {row[1]}, Date: {row[2]}, Subject: {row[3]}, Body: {row[4][:100]}, Sender Email: {row[5]}, Unique ID: {row[6]}, Published: {row[7]}")
+
+    
         
         conn.close()
     else:
         print("Error! Cannot create the database connection.")
+
+
+    print(f"Response by Chatgpt=")
+    print(create_blogpost(emails))
 
 if __name__ == "__main__":
     main()

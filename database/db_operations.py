@@ -30,7 +30,7 @@ def create_table(conn):
         print(e)
 
 def insert_email(conn, email):
-    """Insert a new email summary into the emails table."""
+    """Insert a new email into the emails table."""
     sql = '''INSERT INTO emails(sender_name, date, subject, body, sender_email, unique_id, published)
              VALUES(?, ?, ?, ?, ?, ?, ?)'''
     cursor = conn.cursor()
@@ -46,3 +46,24 @@ def update_email_published_status(conn, email_id, published):
     cursor = conn.cursor()
     cursor.execute(sql, (published, email_id))
     conn.commit()
+
+def get_all_emails(conn):
+    """Get all emails from the emails table."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM emails")
+    rows = cursor.fetchall()
+    return rows
+
+def get_email_by_id(conn, email_id):
+    """Get an email by its unique ID."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM emails WHERE unique_id=?", (email_id,))
+    row = cursor.fetchone()
+    return row
+
+def check_if_email_exists(conn, unique_id):
+    """Check if an email with the given unique ID exists in the database."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM emails WHERE unique_id=?", (unique_id,))
+    return cursor.fetchone() is not None
+
