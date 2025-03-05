@@ -1,24 +1,23 @@
 from dataclasses import dataclass
 from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from database.base import Base
+
 
 @dataclass
-class BlogPostMetadata:
-    def __init__(self, 
-                 title: str, 
-                 subtitle: str, 
-                 date: datetime, 
-                 description: str, 
-                 author: str,
-                 image: str,
-                 slug: str):
-         self.title = title
-         self.subtitle = subtitle
-         self.date = date
-         self.description = description
-         self.author = author
-         self.image = image
-         self.slug = slug
+class BlogPostMetadata(Base):
+    __tablename__ = 'blog_post_metadata'
 
-    def __repr__(self):
-          return f"BlogPostMetadata(title={self.title}, date={self.date}, author={self.author})"
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    title: str = Column(String, nullable=False)
+    subtitle: str = Column(String)
+    date: datetime = Column(DateTime, nullable=False)
+    description: str = Column(String, nullable=False)
+    author: str = Column(String, nullable=False)
+    image: str = Column(String)
+    slug: str = Column(String)
 
+    # Back reference to BlogPost
+    blogposts = relationship('BlogPost', back_populates='blogpost_metadata')

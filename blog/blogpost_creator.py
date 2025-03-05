@@ -97,18 +97,25 @@ def create_blogpost(emails: list) -> BlogPost:
             model=model,
             max_tokens=1000
         )
-        stripped_response = response.choices[0].message.content.strip()
-        blogpost = create_blogpost_instance_from_yaml(stripped_response, prompt, len(emails), response.usage.total_tokens, [email.sender_name for email in emails])
+        response_with_backticks = response.choices[0].message.content
 
-        database.db_operations.insert_blogpost(blogpost)
+        if not isinstance(response_with_backticks, str):
+            raise ValueError("Response is not a valid string.")
+        
+        response_with_backticks = response_with_backticks.strip()
+        cleaned_response = response_with_backticks.strip('```yaml').strip('```')
+        # TODO Running into an issue with ´´´yaml, the response starts and ends with ´´´ . Which causes an error when parsing the YAML, but we need this for our markdown file. So we need to remove it before parsing and later add it back when creating our markdown file
+        blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, [email.sender_name for email in emails])
 
-        return blogpost
+        newly_created_blogpost = database.db_operations.insert_blogpost(blogpost)
+        
+        return newly_created_blogpost
+    except GeneratorExit:
+        print("Generator was forcefully closed.")
     except Exception as e:
         print(f"Error in generating blogpost: {e}")
         return "Failed to generate blogpost"
-    
-    
-    
+
 def format_email_body_for_openai(emails: list) -> str:
     """Takes the needed data and structures it for OpenAI processing."""
     
@@ -132,20 +139,30 @@ def format_email_body_for_openai(emails: list) -> str:
 
 def parse_yaml_response(response: str):
     """Parses YAML response into a Python dictionary."""
-    parsed_data = yaml.safe_load(response)
+    try:
+        parsed_data = yaml.safe_load(response)
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML response: {e}")
     return parsed_data
 
 def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_emails: int, amount_of_tokens: int, newsletter_sources: list) -> BlogPost:
     """Creates a BlogPost instance from the parsed YAML response."""
     parsed_data = parse_yaml_response(response)
+
+    # Validate required fields
+    required_fields = ["subtitle", "description", "content"]
+    for field in required_fields:
+        if field not in parsed_data:
+            raise ValueError(f"Missing required field in response: {field}")
+
     metadata = BlogPostMetadata(
-        title="Weekly AI News Summary",
+        title=os.getenv("WEEKLY_AI_TITLE"),
         subtitle=parsed_data["subtitle"],
-        date=datetime.now().strftime("%Y-%m-%d"),
+        date=datetime.now(),
         description=parsed_data["description"],
         author="AI",
-        image=None, # TODO Add image later, figure out if we wanna use AI-generated images
-        slug=None  # TODO Add slug later. This is the end of the url of the blogpost
+        image=None,  # TODO Add image later, figure out if we wanna use AI-generated images
+        slug=None  # Slug is being generated later as I need the unique ID to generate it
     )
     blogpost = BlogPost(
         created_at=datetime.now(),
@@ -153,24 +170,24 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         content=parsed_data["content"],
         email_count=amount_of_emails, 
         newsletter_sources=newsletter_sources, 
-        word_count= len(remove_html_elements(parsed_data["content"])), 
+        word_count=len(remove_html_elements(parsed_data["content"])), 
         openai_model=model,
         tokens_used=amount_of_tokens, 
         markdown_file_path=None,
-        status= BlogPostStatus.DRAFT,
+        status=BlogPostStatus.DRAFT,
         tags=[],
         prompt_used=prompt,
-        metadata=metadata
+        blogpost_metadata=metadata
     )
+
     return blogpost
 
 def remove_html_elements(html_content: str) -> str:
     """Removes HTML elements from the content to count the amount of words used for the blogpost."""
     soup = BeautifulSoup(html_content, "html.parser")
-    print("Compare the length of the content before and after removing HTML elements:") # TODO Check if it works correctly, afterwards remove print statements
-    print(len(html_content))
-    print(len(soup.get_text()))
     return soup.get_text()
+
+
 
 # TODO Analyse OpenAI's response if it contains everything we need for the blog post
 # TODO If it does, we can proceed to save it in the database

@@ -16,7 +16,7 @@ GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 
 def fetch_emails(service, newsletters):
     """Fetches AI newsletter emails from the last 7 days and summarizes them."""
-    query = ' OR '.join([f'from:{sender}' for sender in newsletters]) + ' newer_than:7d'  # Fetch last 7 days
+    query = ' OR '.join([f'from:{sender[0]}' for sender in newsletters if isinstance(sender[0], str) and '@' in sender[0]]) + ' newer_than:7d'  # Fetch last 7 days
     print(f"Constructed Query: {query}")  # Debugging statement
     results = service.users().messages().list(userId="me", q=query).execute()
     # Fetch the list of messages
@@ -33,9 +33,15 @@ def fetch_emails(service, newsletters):
 
     return emails
 
-def create_email_object(subject, body, sender_name, sender_email, date, unique_id):
+def create_email_object(subject, body, sender_name, sender_email, date, gmail_id):
     """Creates an Email object from the Gmail API result."""
-    email_obj = Email(sender_name, date, subject, body, sender_email, unique_id)
+    email_obj = Email(
+        sender_name=sender_name, 
+        date=date, 
+        subject=subject, 
+        body=body, 
+        sender_email=sender_email, 
+        gmail_id=gmail_id)
     return email_obj
 
 def store_each_email_in_db(email_content):
@@ -55,12 +61,11 @@ def get_email_content(service, user_id, email_id):
 
     sender_name, sender_email = parseaddr(sender)
 
-    payload_without_emojis = remove_emojis(payload)
+    extracted_body = extract_email_body(payload)
 
-    body = extract_email_body(payload_without_emojis)
-    print(f"Extracted - Subject: {subject}, Sender: {sender_name} <{sender_email}>, Date: {date}, Body: {body[:100]}")
+    body_without_emojis = remove_emojis(extracted_body)
 
-    return subject, body, sender_name, sender_email, date, email_id
+    return subject, body_without_emojis, sender_name, sender_email, date, email_id
 
 def extract_email_body(payload):
     """Extracts email body, prioritizing text/plain but falling back to text/html."""

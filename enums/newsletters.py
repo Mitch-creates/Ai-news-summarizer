@@ -1,6 +1,8 @@
-from enum import Enum
+from enum import Enum as PyEnum
+from sqlalchemy import Enum as SqlAlchemyEnum
 
-class Newsletters(Enum):
+
+class Newsletters(PyEnum):
     BENSBITES = ("bensbites@mail.bensbites.co", False)
     THERUNDOWN = ("news@daily.therundown.ai", False)
     TLDR = ("dan@tldrnewsletter.com", True)

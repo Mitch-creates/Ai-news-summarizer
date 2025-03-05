@@ -1,242 +1,207 @@
-import sqlite3
-from sqlite3 import Error
+from contextlib import contextmanager
 import json
+import os
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base, joinedload
+from sqlalchemy.exc import SQLAlchemyError
+from dotenv import load_dotenv
 from enums.blogpost_status import BlogPostStatus
+from enums.gmail_labels import GmailLabels
+from enums.newsletters import Newsletters
 from datetime import datetime
+from entities.Email import Email
 from entities.Blogpost import BlogPost
 from entities.Blogpost_metadata import BlogPostMetadata
+import logging
+from database.base import Base
 
-def create_connection(db_file):
-    """Create a database connection to the SQLite database specified by db_file."""
-    conn = None
+# Enable logging
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)  # Show SQL queries
+logging.getLogger('sqlalchemy').setLevel(logging.DEBUG)  # Show additional debug info
+
+load_dotenv("config/environment_variables.env")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL, echo=True)
+Session = sessionmaker(bind=engine)
+
+@contextmanager
+def get_session():
+    """Context manager for SQLAlchemy session."""
+    session = Session()
     try:
-        conn = sqlite3.connect(db_file)
-        print(f"SQLite Database connected: {db_file}")
-    except Error as e:
-        print(e)
-    return conn
+        yield session
+        session.commit()
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"Error: {e}")
+    finally:
+        session.close()
 
-def create_table(conn):
-    """Create a table for storing email objects."""
+def initialize_database():
+    """Initialize the database with the required tables."""
     try:
-        sql_create_emails_table = """CREATE TABLE IF NOT EXISTS emails (
-                                        id integer PRIMARY KEY,
-                                        sender_name text NOT NULL,
-                                        date text NOT NULL,
-                                        subject text NOT NULL,
-                                        body text NOT NULL,
-                                        sender_email text NOT NULL,
-                                        unique_id text NOT NULL,
-                                        published integer NOT NULL
-                                    );"""
-        cursor = conn.cursor()
-        cursor.execute(sql_create_emails_table)
-    except Error as e:
-        print(e)
+        # Print the names of the tables to see if the table exists in metadata
+        print("Tables in metadata:", Base.metadata.tables.keys())
+        Base.metadata.create_all(engine)  # Create all tables
+        print("Tables created successfully.")
+        print("Registered Models:", Base.metadata.tables)
+        
+        # Check again to confirm
+        print("Tables after creation:", Base.metadata.tables.keys())
 
-def insert_email(conn, email):
+    except SQLAlchemyError as e:
+        print(f"Error creating database tables: {e}")
+
+def insert_email(email):
     """Insert a new email into the emails table and return the created email."""
-    sql = '''INSERT INTO emails(sender_name, date, subject, body, sender_email, unique_id, published)
-             VALUES(?, ?, ?, ?, ?, ?, ?)'''
-    cursor = conn.cursor()
-    cursor.execute(sql, email)
-    conn.commit()
-    email_id = cursor.lastrowid
-    return get_email_by_id(conn, email_id)
 
-def update_email_published_status(conn, email_id, published):
+    if isinstance(email.date, str):
+        email.date = convert_date(email.date)
+
+    with get_session() as session:
+        session.add(email)
+        session.commit()
+        session.refresh(email)
+    return email
+
+def update_email_published_status(email_id, published):
     """Update the published status of an email and return the updated email."""
-    sql = '''UPDATE emails
-             SET published = ?
-             WHERE unique_id = ?'''
-    cursor = conn.cursor()
-    cursor.execute(sql, (published, email_id))
-    conn.commit()
-    return get_email_by_id(conn, email_id)
+    with get_session() as session:
+        email = session.query(Email).filter(Email.id == email_id).first()
+        if email:
+            email.published = published
+            session.commit()
+            session.refresh(email)
+    return email
 
-def get_all_emails(conn):
+def get_all_emails():
     """Get all emails from the emails table."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM emails")
-    rows = cursor.fetchall()
-    return rows
+    with get_session() as session:
+        emails = session.query(Email).all()
+    return emails
 
-def get_email_by_id(conn, email_id):
+def get_email_by_id(email_id):
     """Get an email by its unique ID."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM emails WHERE id=?", (email_id,))
-    row = cursor.fetchone()
-    return row
+    with get_session() as session:
+        email = session.query(Email).filter(Email.id == email_id).first()
+    return email
 
-def check_if_email_exists(conn, unique_id):
-    """Check if an email with the given unique ID exists in the database."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM emails WHERE id=?", (unique_id,))
-    return cursor.fetchone() is not None
+def check_if_email_exists_by_gmail_id(gmail_id):
+    """Check if an email with the given unique Gmail ID exists in the database."""
+    with get_session() as session:
+        exists = session.query(Email).filter(Email.gmail_id == gmail_id).first() is not None
+    return exists
 
-def create_blogpost_table(conn):
-    """Create a table for storing blog posts."""
-    try:
-        sql_create_blogpost_table = """CREATE TABLE IF NOT EXISTS blogposts (
-                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        title TEXT NOT NULL,
-                                        subtitle TEXT,
-                                        created_at TEXT NOT NULL,
-                                        published_at TEXT,
-                                        content TEXT NOT NULL,
-                                        email_count INTEGER NOT NULL,
-                                        newsletter_sources TEXT NOT NULL,
-                                        word_count INTEGER NOT NULL,
-                                        openai_model TEXT NOT NULL,
-                                        tokens_used INTEGER NOT NULL,
-                                        markdown_file_path TEXT NOT NULL,
-                                        status TEXT NOT NULL,
-                                        tags TEXT NOT NULL,
-                                        prompt_used TEXT NOT NULL,
-                                        metadata TEXT NOT NULL
-                                    );"""
-        cursor = conn.cursor()
-        cursor.execute(sql_create_blogpost_table)
-    except Error as e:
-        print(e)
-
-def insert_blogpost(conn, blogpost):
+def insert_blogpost(blogpost):
     """Insert a new blog post into the database and return the created blog post."""
-    sql = '''INSERT INTO blogposts(title, subtitle, created_at, published_at, content, 
-                                   email_count, newsletter_sources, word_count, 
-                                   openai_model, tokens_used, markdown_file_path, 
-                                   status, tags, prompt_used, metadata)
-             VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
-    cursor = conn.cursor()
+
+    if isinstance(blogpost.published_at, str):
+        blogpost.published_at = convert_date(blogpost.published_at)
+
+    if isinstance(blogpost.created_at, str):
+        blogpost.created_at = convert_date(blogpost.created_at)
+
+    if isinstance(blogpost.newsletter_sources, list):
+        blogpost.newsletter_sources = json.dumps(blogpost.newsletter_sources)  # Convert list to JSON string
+
+    if isinstance(blogpost.tags, list):
+        blogpost.tags = json.dumps(blogpost.tags)
     
-    cursor.execute(sql, (
-        blogpost.metadata.title,  # Use metadata title
-        blogpost.metadata.subtitle,  # Use metadata subtitle
-        blogpost.created_at.isoformat(),  # Convert datetime to string
-        blogpost.published_at.isoformat() if blogpost.published_at else None, 
-        blogpost.content, 
-        blogpost.email_count, 
-        json.dumps(blogpost.newsletter_sources),  # Convert list to JSON string
-        blogpost.word_count, 
-        blogpost.openai_model, 
-        blogpost.tokens_used, 
-        blogpost.markdown_file_path, 
-        blogpost.status.value,  # Store enum as string
-        json.dumps(blogpost.tags),  # Convert list to JSON string
-        blogpost.prompt_used,
-        json.dumps(blogpost.metadata.__dict__)  # Convert metadata to JSON string
-    ))
-    
-    conn.commit()
-    blogpost.id = cursor.lastrowid  # Set the generated ID to the blogpost object
-    return get_blogpost_by_id(conn, blogpost.id)
+    with get_session() as session:
+        session.add(blogpost)
+        session.commit()
+        if blogpost in session: print("Blogpost added to session")
+        else: print("Blogpost not added to session")
+        session.refresh(blogpost)
 
-def get_blogpost_by_id(conn, post_id):
-    """Retrieve a blog post by ID and convert JSON fields back to Python lists."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM blogposts WHERE id=?", (post_id,))
-    row = cursor.fetchone()
+        blogpost.blogpost_metadata.slug = generate_next_slug(blogpost)
+        session.commit()
+    return blogpost
 
-    if row:
-        metadata_dict = json.loads(row[14])  # Convert JSON string back to dict
-        metadata = BlogPostMetadata(**metadata_dict)  # Create BlogPostMetadata object
+def generate_next_slug(blogpost: BlogPost) -> str:
+    """Generates the next unique slug for the blogpost."""
+    return f"{os.getenv('WEEKLY_AI_SLUG')}-{blogpost.id}"
 
-        return BlogPost(
-            created_at=datetime.fromisoformat(row[3]),
-            published_at=datetime.fromisoformat(row[4]) if row[4] else None,
-            content=row[5],
-            email_count=row[6],
-            newsletter_sources=json.loads(row[7]),  # Convert JSON string back to list
-            word_count=row[8],
-            openai_model=row[9],
-            tokens_used=row[10],
-            markdown_file_path=row[11],
-            status=BlogPostStatus(row[12]),  # Convert string back to Enum
-            tags=json.loads(row[13]),  # Convert JSON string back to list
-            prompt_used=row[14],
-            metadata=metadata  # Use the BlogPostMetadata object
-        )
-    
-    return None
+def get_blogpost_by_id(post_id):
+    """Retrieve a blog post and its metadata using metadata_id."""
+    with get_session() as session:
+        blogpost = session.query(BlogPost).filter(BlogPost.id == post_id).first()
+        if blogpost:
+            blogpost.newsletter_sources = json.loads(blogpost.newsletter_sources)  # Convert JSON string back to list
+            blogpost.created_at = blogpost.created_at.isoformat() if blogpost.created_at else None
+            blogpost.published_at = blogpost.published_at.isoformat() if blogpost.published_at else None
+    return blogpost
 
-def update_blogpost_status(conn, post_id, new_status):
+def update_blogpost_status(post_id, new_status):
     """Update the status of a blog post and return the updated blog post."""
-    sql = '''UPDATE blogposts SET status = ? WHERE id = ?'''
-    cursor = conn.cursor()
-    cursor.execute(sql, (new_status.value, post_id))  # Store enum as string
-    conn.commit()
-    return get_blogpost_by_id(conn, post_id)
+    with get_session() as session:
+        blogpost = session.query(BlogPost).filter(BlogPost.id == post_id).first()
+        if blogpost:
+            blogpost.status = new_status
+            session.commit()
+            session.refresh(blogpost)
+    return blogpost
 
-def create_blogpost_metadata_table(conn):
-    """Create a table for storing blog post metadata."""
-    try:
-        sql_create_blogpost_metadata_table = """CREATE TABLE IF NOT EXISTS blogpost_metadata (
-                                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                title TEXT NOT NULL,
-                                                subtitle TEXT,
-                                                date TEXT NOT NULL,
-                                                description TEXT NOT NULL,
-                                                author TEXT NOT NULL,
-                                                image TEXT NOT NULL,
-                                                slug TEXT NOT NULL
-                                            );"""
-        cursor = conn.cursor()
-        cursor.execute(sql_create_blogpost_metadata_table)
-    except Error as e:
-        print(e)
+#TODO figure out where changing between string and datetime will be necessary
+#TODO lists aren't allowed in the database, so we need to convert them to strings but also to lists when we retrieve them
 
-def insert_blogpost_metadata(conn, metadata):
+def update_blogpost(post_id, blogpost):
+    """Update an existing blog post and return the updated blog post."""
+    with get_session() as session:
+        existing_blogpost = session.query(BlogPost).filter(BlogPost.id == post_id).first()
+        if existing_blogpost:
+            for key, value in blogpost.__dict__.items():
+                if key == 'newsletter_sources' and isinstance(value, list):
+                    value = json.dumps(value)  # Convert list to JSON string
+                if key == 'tags' and isinstance(value, list):
+                    value = json.dumps(value)  # Convert list to JSON string
+                if key in ['created_at', 'published_at'] and isinstance(value, str):
+                    value = convert_date(value)  # Convert string to datetime
+                setattr(existing_blogpost, key, value)
+            session.commit()
+            session.refresh(existing_blogpost)
+            existing_blogpost.newsletter_sources = json.loads(existing_blogpost.newsletter_sources)  # Convert JSON string back to list
+            existing_blogpost.tags = json.loads(existing_blogpost.tags)  # Convert JSON string back to list
+            existing_blogpost.created_at = existing_blogpost.created_at.isoformat() if existing_blogpost.created_at else None
+            existing_blogpost.published_at = existing_blogpost.published_at.isoformat() if existing_blogpost.published_at else None
+    return existing_blogpost
+
+def insert_blogpost_metadata(metadata):
     """Insert a new blog post metadata into the database and return the created metadata."""
-    sql = '''INSERT INTO blogpost_metadata(title, subtitle, date, description, author, image, slug)
-             VALUES(?, ?, ?, ?, ?, ?, ?)'''
-    cursor = conn.cursor()
-    cursor.execute(sql, (
-        metadata.title,
-        metadata.subtitle,
-        metadata.date.isoformat(),  # Convert datetime to string
-        metadata.description,
-        metadata.author,
-        metadata.image,
-        metadata.slug
-    ))
-    conn.commit()
-    metadata.id = cursor.lastrowid  # Set the generated ID to the metadata object
-    return get_blogpost_metadata_by_id(conn, metadata.id)
 
-def get_blogpost_metadata_by_id(conn, metadata_id):
-    """Retrieve blog post metadata by ID and convert JSON fields back to Python lists."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM blogpost_metadata WHERE id=?", (metadata_id,))
-    row = cursor.fetchone()
-
-    if row:
-        return BlogPostMetadata(
-            title=row[1],
-            subtitle=row[2],
-            date=datetime.fromisoformat(row[3]),  # Convert string back to datetime
-            description=row[4],
-            author=row[5],
-            image=row[6],
-            slug=row[7]
-        )
+    if isinstance(metadata.date, str):
+        metadata.date = convert_date(metadata.date)
     
-    return None
+    with get_session() as session:
+        session.add(metadata)
+        session.commit()
+        session.refresh(metadata)
+    return metadata
 
-def update_blogpost_metadata(conn, metadata_id, metadata):
-    """Update an existing blog post metadata and return the updated metadata."""
-    sql = '''UPDATE blogpost_metadata
-             SET title = ?, subtitle = ?, date = ?, description = ?, author = ?, image = ?, slug = ?
-             WHERE id = ?'''
-    cursor = conn.cursor()
-    cursor.execute(sql, (
-        metadata.title,
-        metadata.subtitle,
-        metadata.date.isoformat(),  # Convert datetime to string
-        metadata.description,
-        metadata.author,
-        metadata.image,
-        metadata.slug,
-        metadata_id
-    ))
-    conn.commit()
-    return get_blogpost_metadata_by_id(conn, metadata_id)
+def get_blogpost_metadata_by_id(metadata_id):
+    """Retrieve blog post metadata by ID and convert JSON fields back to Python lists."""
+    with get_session() as session:
+        metadata = session.query(BlogPostMetadata).filter(BlogPostMetadata.id == metadata_id).first()
+        if metadata:
+            metadata.date = metadata.date.isoformat() if metadata.date else None
+    return metadata
+
+def update_blogpost_metadata(metadata_id, metadata):
+    """Update an existing blog post metadata and return updated metadata."""
+    with get_session() as session:
+        existing_metadata = session.query(BlogPostMetadata).filter(BlogPostMetadata.id == metadata_id).first()
+        if existing_metadata:
+            for key, value in metadata.__dict__.items():
+                if key == 'date' and isinstance(value, str):
+                    value = convert_date(value)  # Convert string to datetime
+                setattr(existing_metadata, key, value)
+            session.commit()
+            session.refresh(existing_metadata)
+            existing_metadata.date = existing_metadata.date.isoformat() if existing_metadata.date else None
+    return existing_metadata
+
+def convert_date(date_str):
+    return datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S +0000")

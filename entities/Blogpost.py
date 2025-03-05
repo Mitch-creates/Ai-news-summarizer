@@ -1,36 +1,36 @@
+from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
+
+from sqlalchemy import ARRAY, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 from entities.Blogpost_metadata import BlogPostMetadata
+from sqlalchemy.ext.declarative import declarative_base
 from enums.blogpost_status import BlogPostStatus
+from sqlalchemy import Enum as SqlAlchemyEnum
+from database.base import Base
 
-class BlogPost:
-    def __init__(self, 
-                 created_at: datetime, 
-                 published_at: Optional[datetime], 
-                 content: str, 
-                 email_count: int, 
-                 newsletter_sources: List[str], 
-                 word_count: int, 
-                 openai_model: str, 
-                 tokens_used: int, 
-                 markdown_file_path: str, 
-                 status: BlogPostStatus, 
-                 tags: List[str],
-                 prompt_used: str,
-                 metadata: BlogPostMetadata):
-        self.created_at = created_at  # datetime
-        self.published_at = published_at  # datetime or None if not published yet
-        self.content = content  # str (Full blog post)
-        self.email_count = email_count  # int (Number of emails used)
-        self.newsletter_sources = newsletter_sources  # List[str] (List of newsletter names)
-        self.word_count = word_count  # int (Word count of the post)
-        self.openai_model = openai_model  # str (e.g., "gpt-3.5-turbo")
-        self.tokens_used = tokens_used  # int (Total tokens used in API call)
-        self.markdown_file_path = markdown_file_path  # str (Path to saved .md file)
-        self.status = status  # Enum (e.g., "draft", "published", "archived")
-        self.tags = tags  # List[str] (For metadata and organization)
-        self.prompt_used = prompt_used  # str (The prompt used to generate the blog post)
-        self.metadata = metadata  #All the metadata which goes in the markdown file
+@dataclass
+class BlogPost(Base):
+    __tablename__ = 'blogposts'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    published_at = Column(DateTime, nullable=True)
+    content = Column(Text, nullable=False)
+    email_count = Column(Integer, nullable=False)
+    newsletter_sources = Column(Text, nullable=False)
+    word_count = Column(Integer, nullable=False)
+    openai_model = Column(String, nullable=False)
+    tokens_used = Column(Integer, nullable=False)
+    markdown_file_path = Column(String)
+    status = Column(SqlAlchemyEnum(BlogPostStatus), nullable=False)  # ForeignKey to your Enum table (assuming it's stored in DB)
+    tags = Column(String)  # Storing list as an array (use PostgreSQL)
+    prompt_used = Column(String)
+    blogpost_metadata_id = Column(Integer, ForeignKey('blog_post_metadata.id'))  # ForeignKey to BlogPostMetadata
 
-    def __repr__(self):
-        return f"BlogPost(created_at={self.created_at}, status={self.status}, email_count={self.email_count})"
+    # Relationship with BlogPostMetadata
+    blogpost_metadata = relationship("BlogPostMetadata", back_populates="blogposts")
+
+
+       
