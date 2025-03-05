@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from auth.gmail_auth import authenticate_gmail  # Import your authentication function
@@ -7,6 +8,10 @@ from database.db_operations import initialize_database, insert_blogpost, insert_
 from entities.Email import Email
 from enums.newsletters import Newsletters
 from blog.blogpost_creator import create_blogpost
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from file_processing.markdown_file_creator import generate_markdown_file  # Ensure file_processing is in the same directory or update the import path
 
 load_dotenv("config/environment_variables.env")
 
@@ -55,6 +60,7 @@ def main():
     
     print(f"Response by Chatgpt=")
     newly_created_blogpost = create_blogpost(emails)
+    generate_markdown_file(newly_created_blogpost)
     print(newly_created_blogpost)
 
 if __name__ == "__main__":

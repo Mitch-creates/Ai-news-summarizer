@@ -161,8 +161,8 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         date=datetime.now(),
         description=parsed_data["description"],
         author="AI",
-        image=None,  # TODO Add image later, figure out if we wanna use AI-generated images
-        slug=None  # Slug is being generated later as I need the unique ID to generate it
+        image="img/backgroundLaos.jpg",  # TODO Add image later, figure out if we wanna use AI-generated images
+        slug=None
     )
     blogpost = BlogPost(
         created_at=datetime.now(),
