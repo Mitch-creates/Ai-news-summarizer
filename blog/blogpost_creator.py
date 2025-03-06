@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import openai
 import os
 from dotenv import load_dotenv
@@ -6,6 +7,7 @@ import yaml
 from bs4 import BeautifulSoup
 
 from entities.Blogpost import BlogPost
+from entities.BlogpostDTO import BlogPostDTO
 from entities.Blogpost_metadata import BlogPostMetadata
 from enums.blogpost_status import BlogPostStatus
 import database.db_operations
@@ -186,6 +188,77 @@ def remove_html_elements(html_content: str) -> str:
     """Removes HTML elements from the content to count the amount of words used for the blogpost."""
     soup = BeautifulSoup(html_content, "html.parser")
     return soup.get_text()
+
+def generate_markdown_file(blogpostDTO: BlogPostDTO):
+    """Generate a markdown file from a Blogpost object"""
+    try:
+        # Ensure output directory exists
+        markdown_path = os.getenv("MARKDOWN_PATH")
+        os.makedirs(markdown_path, exist_ok=True)
+
+        # Define filename
+        slug = blogpostDTO.blogpost_metadata.slug
+        filename = f"{slug}.md"
+        filepath = os.path.join(markdown_path, filename)
+
+        # Create front matter (YAML metadata)
+        front_matter = {
+            "layout": "post",
+            "title": format_front_matter_value(blogpostDTO.blogpost_metadata.title),
+            "subtitle": format_front_matter_value(blogpostDTO.blogpost_metadata.subtitle),
+            "date": format_front_matter_value(blogpostDTO.blogpost_metadata.date),
+            "author": format_front_matter_value(blogpostDTO.blogpost_metadata.author),
+            "image": format_front_matter_value(blogpostDTO.blogpost_metadata.image),
+            "slug": format_front_matter_value(blogpostDTO.blogpost_metadata.slug),
+            "description": format_front_matter_value(blogpostDTO.blogpost_metadata.description)
+        }
+        #print values of front matter
+        print("Values of front matter")
+        print(front_matter)
+
+        # Convert front matter to YAML format
+        front_matter_yaml = yaml.dump(front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True, default_style='"', width=float('inf'))
+
+        # Write Markdown file
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write("---\n")
+            file.write(front_matter_yaml)
+            file.write("---\n\n")
+            file.write(blogpostDTO.content)
+
+        return filepath
+    except Exception as e:
+        print(f"An error occurred during the generation of the markdown file: {e}")
+        return None
+
+def format_front_matter_value(value):
+    """
+    Formats values for YAML front matter:
+    - Dates are converted to 'YYYY-MM-DD' format.
+    - Strings are enclosed in double quotes, but avoids double-wrapping.
+    - Lists are converted to YAML-compatible strings.
+    - None values become empty strings.
+    """
+    
+    print(f"Type of value: {type(value)}")
+    if isinstance(value, datetime):
+        # Ensure the date is formatted correctly: YYYY-MM-DD
+        print(f"Value is a datetime to str hopefully: {value.strftime("%Y-%m-%d")}")
+        return value.strftime("%Y-%m-%d")
+    elif isinstance(value, str):
+        
+        # If the string starts and ends with single quotes, remove them
+        if value.startswith("'") and value.endswith("'"):
+            value = value.replace("'", "’")  # Replace single quotes with typographic apostrophes
+            return value[1:-1]
+        if value.startswith('"') and value.endswith('"'):
+            value = value.replace("'", "’")  # Replace single quotes with typographic apostrophes
+            return value[1:-1]
+    elif isinstance(value, list):
+        return json.dumps(value)  # Ensure list is properly converted
+    elif value is None:
+        return ""  # Handle None values as empty string
+    return value  
 
 
 

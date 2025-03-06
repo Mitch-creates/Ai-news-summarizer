@@ -12,6 +12,7 @@ from datetime import datetime
 from entities.Email import Email
 from entities.Blogpost import BlogPost
 from entities.Blogpost_metadata import BlogPostMetadata
+from entities.BlogpostDTO import BlogPostDTO, BlogPostMetadataDTO
 import logging
 from database.base import Base
 
@@ -25,7 +26,7 @@ load_dotenv("config/environment_variables.env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL, echo=True)
-Session = sessionmaker(bind=engine)
+Session = sessionmaker(bind=engine, expire_on_commit=False)
 
 @contextmanager
 def get_session():
@@ -113,13 +114,17 @@ def insert_blogpost(blogpost):
     with get_session() as session:
         session.add(blogpost)
         session.commit()
-        if blogpost in session: print("Blogpost added to session")
-        else: print("Blogpost not added to session")
         session.refresh(blogpost)
 
-        blogpost.blogpost_metadata.slug = generate_next_slug(blogpost)
-        session.commit()
-    return blogpost
+        if blogpost.blogpost_metadata:
+            session.refresh(blogpost.blogpost_metadata)
+
+        if blogpost.blogpost_metadata and not blogpost.blogpost_metadata.slug:
+            blogpost.blogpost_metadata.slug = generate_next_slug(blogpost)
+            session.commit()
+        blogpost = get_blogpost_by_id(blogpost.id)
+
+    return BlogPostDTO.from_orm(blogpost)
 
 def generate_next_slug(blogpost: BlogPost) -> str:
     """Generates the next unique slug for the blogpost."""
@@ -128,12 +133,13 @@ def generate_next_slug(blogpost: BlogPost) -> str:
 def get_blogpost_by_id(post_id):
     """Retrieve a blog post and its metadata using metadata_id."""
     with get_session() as session:
-        blogpost = session.query(BlogPost).filter(BlogPost.id == post_id).first()
+        blogpost = session.query(BlogPost).options(joinedload(BlogPost.blogpost_metadata)).filter(BlogPost.id == post_id).first()
         if blogpost:
             blogpost.newsletter_sources = json.loads(blogpost.newsletter_sources)  # Convert JSON string back to list
+            blogpost.tags = json.loads(blogpost.tags)  # Convert JSON string back to list
             blogpost.created_at = blogpost.created_at.isoformat() if blogpost.created_at else None
             blogpost.published_at = blogpost.published_at.isoformat() if blogpost.published_at else None
-    return blogpost
+    return BlogPostDTO.from_orm(blogpost)
 
 def update_blogpost_status(post_id, new_status):
     """Update the status of a blog post and return the updated blog post."""
@@ -143,7 +149,8 @@ def update_blogpost_status(post_id, new_status):
             blogpost.status = new_status
             session.commit()
             session.refresh(blogpost)
-    return blogpost
+            blogpost = get_blogpost_by_id(blogpost.id)
+    return BlogPostDTO.from_orm(blogpost)
 
 #TODO figure out where changing between string and datetime will be necessary
 #TODO lists aren't allowed in the database, so we need to convert them to strings but also to lists when we retrieve them
@@ -151,7 +158,7 @@ def update_blogpost_status(post_id, new_status):
 def update_blogpost(post_id, blogpost):
     """Update an existing blog post and return the updated blog post."""
     with get_session() as session:
-        existing_blogpost = session.query(BlogPost).filter(BlogPost.id == post_id).first()
+        existing_blogpost = session.query(BlogPost).options(joinedload(BlogPost.blogpost_metadata)).filter(BlogPost.id == post_id).first()
         if existing_blogpost:
             for key, value in blogpost.__dict__.items():
                 if key == 'newsletter_sources' and isinstance(value, list):
@@ -167,7 +174,7 @@ def update_blogpost(post_id, blogpost):
             existing_blogpost.tags = json.loads(existing_blogpost.tags)  # Convert JSON string back to list
             existing_blogpost.created_at = existing_blogpost.created_at.isoformat() if existing_blogpost.created_at else None
             existing_blogpost.published_at = existing_blogpost.published_at.isoformat() if existing_blogpost.published_at else None
-    return existing_blogpost
+    return BlogPostDTO.from_orm(existing_blogpost)
 
 def insert_blogpost_metadata(metadata):
     """Insert a new blog post metadata into the database and return the created metadata."""
@@ -179,7 +186,7 @@ def insert_blogpost_metadata(metadata):
         session.add(metadata)
         session.commit()
         session.refresh(metadata)
-    return metadata
+    return BlogPostMetadataDTO.from_orm(metadata)
 
 def get_blogpost_metadata_by_id(metadata_id):
     """Retrieve blog post metadata by ID and convert JSON fields back to Python lists."""
@@ -187,7 +194,7 @@ def get_blogpost_metadata_by_id(metadata_id):
         metadata = session.query(BlogPostMetadata).filter(BlogPostMetadata.id == metadata_id).first()
         if metadata:
             metadata.date = metadata.date.isoformat() if metadata.date else None
-    return metadata
+    return BlogPostMetadataDTO.from_orm(metadata)
 
 def update_blogpost_metadata(metadata_id, metadata):
     """Update an existing blog post metadata and return updated metadata."""
@@ -201,7 +208,8 @@ def update_blogpost_metadata(metadata_id, metadata):
             session.commit()
             session.refresh(existing_metadata)
             existing_metadata.date = existing_metadata.date.isoformat() if existing_metadata.date else None
-    return existing_metadata
-
+    return BlogPostMetadataDTO.from_orm(existing_metadata)
+    
 def convert_date(date_str):
     return datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S +0000")
+

@@ -30,7 +30,7 @@ class BlogPost(Base):
     blogpost_metadata_id = Column(Integer, ForeignKey('blog_post_metadata.id'))  # ForeignKey to BlogPostMetadata
 
     # Relationship with BlogPostMetadata
-    blogpost_metadata = relationship("BlogPostMetadata", back_populates="blogposts")
+    blogpost_metadata = relationship("BlogPostMetadata", back_populates="blogposts", lazy='selectin')
 
 
        

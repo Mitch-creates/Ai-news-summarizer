@@ -7,11 +7,7 @@ from email_processing.gmail_interactions import fetch_emails
 from database.db_operations import initialize_database, insert_blogpost, insert_email, get_all_emails, check_if_email_exists_by_gmail_id
 from entities.Email import Email
 from enums.newsletters import Newsletters
-from blog.blogpost_creator import create_blogpost
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from file_processing.markdown_file_creator import generate_markdown_file  # Ensure file_processing is in the same directory or update the import path
+from blog.blogpost_creator import create_blogpost, generate_markdown_file
 
 load_dotenv("config/environment_variables.env")
 
