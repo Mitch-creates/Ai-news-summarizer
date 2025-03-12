@@ -3,8 +3,11 @@ import json
 from typing import Optional, List
 from datetime import datetime
 
+from enums.blogpost_status import BlogPostStatus
+
 @dataclass
 class BlogPostMetadataDTO:
+    id: Optional[int]
     title: str
     subtitle: Optional[str]
     date: Optional[datetime]
@@ -16,6 +19,7 @@ class BlogPostMetadataDTO:
     @staticmethod
     def from_orm(metadata) -> "BlogPostMetadataDTO":
         return BlogPostMetadataDTO(
+            id=metadata.id,
             title=metadata.title,
             subtitle=metadata.subtitle,
             date=metadata.date,
@@ -28,6 +32,7 @@ class BlogPostMetadataDTO:
     def to_orm(self):
         from entities.Blogpost_metadata import BlogPostMetadata  # Avoid circular import
         return BlogPostMetadata(
+            id=self.id,
             title=self.title,
             subtitle=self.subtitle,
             date=self.date,
@@ -57,6 +62,7 @@ class BlogPostDTO:
     @staticmethod
     def from_orm(blogpost) -> "BlogPostDTO":
         """Converts a SQLAlchemy BlogPost instance into a BlogPostDTO."""
+        print(f"Michiel{type(blogpost.newsletter_sources)}")
         return BlogPostDTO(
             id=blogpost.id,
             created_at=blogpost.created_at,
@@ -68,7 +74,7 @@ class BlogPostDTO:
             openai_model=blogpost.openai_model,
             tokens_used=blogpost.tokens_used,
             markdown_file_path=blogpost.markdown_file_path,
-            status=blogpost.status.name,  # Assuming BlogPostStatus is an Enum
+            status=blogpost.status.value,  # Assuming BlogPostStatus is an Enum
             tags=json.loads(blogpost.tags) if blogpost.tags else [],
             prompt_used=blogpost.prompt_used,
             blogpost_metadata=BlogPostMetadataDTO.from_orm(blogpost.blogpost_metadata) if blogpost.blogpost_metadata else None
@@ -87,7 +93,7 @@ class BlogPostDTO:
             openai_model=self.openai_model,
             tokens_used=self.tokens_used,
             markdown_file_path=self.markdown_file_path,
-            status=self.status,  # If this is an enum, you'll need to convert appropriately
+            status=BlogPostStatus(self.status),  # If this is an enum, you'll need to convert appropriately
             tags=json.dumps(self.tags),
             prompt_used=self.prompt_used,
         )

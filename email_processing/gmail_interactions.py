@@ -17,7 +17,7 @@ GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 def fetch_emails(service, newsletters):
     """Fetches AI newsletter emails from the last 7 days and summarizes them."""
     query = ' OR '.join([f'from:{sender[0]}' for sender in newsletters if isinstance(sender[0], str) and '@' in sender[0]]) + ' newer_than:7d'  # Fetch last 7 days
-    print(f"Constructed Query: {query}")  # Debugging statement
+    # print(f"Constructed Query: {query}")  # Debugging statement
     results = service.users().messages().list(userId="me", q=query).execute()
     # Fetch the list of messages
     messages = results.get("messages", [])

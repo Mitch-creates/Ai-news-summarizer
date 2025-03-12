@@ -1,10 +1,13 @@
-from datetime import datetime
+import time
 import json
+import subprocess
 import openai
 import os
 from dotenv import load_dotenv
 import yaml
 from bs4 import BeautifulSoup
+import requests
+from datetime import datetime
 
 from entities.Blogpost import BlogPost
 from entities.BlogpostDTO import BlogPostDTO
@@ -25,9 +28,23 @@ if api_key is None:
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=api_key)
 
-model = "gpt-3.5-turbo"
+model = os.getenv("OPENAI_MODEL")
 
-def create_blogpost(emails: list) -> BlogPost:
+# Custom YAML dumper to prevent quotes around dates and add quotes for special strings
+class NoQuotesForDatesDumper(yaml.SafeDumper):
+    def represent_str(self, data):
+        """Ensure strings are wrapped in double quotes only when needed."""
+        if ":" in data or "\n" in data or any(c in data for c in ['#', '-', '{', '}']):
+            # Add quotes around strings containing colons, newlines or other special chars
+            return self.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+        # Otherwise, no quotes for simple strings
+        return self.represent_scalar('tag:yaml.org,2002:str', data)
+
+    def represent_datetime(self, data):
+        """Ensure dates are written in YYYY-MM-DD format without quotes."""
+        return self.represent_scalar('tag:yaml.org,2002:timestamp', data.strftime("%Y-%m-%d"))
+    
+def create_blogpost(emails: list) -> BlogPostDTO:
     """Summarizes the email body using OpenAI's GPT-3.5 model."""
     body = format_email_body_for_openai(emails)
 
@@ -57,41 +74,83 @@ def create_blogpost(emails: list) -> BlogPost:
     #     f"{body}"
     # )
 
+    # prompt = (f"You are an AI-powered blog writer specializing in AI news. Below is a collection of AI-related newsletters from the past week.\n\n"
+    # f"### Task:\n"
+    # f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news.\n"
+    # f"2. **Extract key insights** from the remaining newsletters and merge them into a structured, engaging, and easy-to-read blog post.\n"
+    # f"3. Start the blog post with a **short, fun, and engaging introduction** about yourself and the AI news you'll cover.\n"
+    # f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog.\n\n"
+    # f"### Guidelines:\n"
+    # f"- Focus on **readability** and an engaging **storytelling approach**.\n"
+    # f"- Maintain a **conversational yet informative tone**.\n"
+    # f"- Highlight **the most important AI developments** in a structured format.\n"
+    # f"- Make the post **flow naturally** instead of just summarizing bullet points.\n"
+    # f"- If possible, include an insightful closing statement or takeaway.\n\n"
+    # f"### Response Format:\n"
+    # f"Generate the response as a structured YAML document with the following format:\n"
+    # f"```yaml\n"
+    # f"subtitle: \"A short, engaging one-liner summarizing the blog post\"\n"
+    # f"description: \"A concise, engaging summary of the blog post (2-3 sentences)\"\n"
+    # f"content: |\n"
+    # f"  <h1>Weekly AI News Summary</h1>\n"
+    # f"  \n"
+    # f"  <h2>[Subtitle Here]</h2>\n"
+    # f"  \n"
+    # f"  <p>[Introduction]</p>\n"
+    # f"  \n"
+    # f"  <h2>[Subheading]</h2>\n"
+    # f"  <p>[Paragraph about AI news]</p>\n"
+    # f"  \n"
+    # f"  <h2>[Another Subheading]</h2>\n"
+    # f"  <p>[More AI news]</p>\n"
+    # f"  \n"
+    # f"  <p>[Closing statement]</p>\n"
+    # f"```\n"
+    # f"Ensure the `content` field contains properly formatted HTML elements, including `<h1>`, `<h2>`, and `<p>`, without bullet points unless necessary.\n\n"
+    # f"{body}"
+    # )
+
     prompt = (f"You are an AI-powered blog writer specializing in AI news. Below is a collection of AI-related newsletters from the past week.\n\n"
     f"### Task:\n"
-    f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news.\n"
+    f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news (yes, the ones full of buzzwords and no substance).\n"
     f"2. **Extract key insights** from the remaining newsletters and merge them into a structured, engaging, and easy-to-read blog post.\n"
-    f"3. Start the blog post with a **short, fun, and engaging introduction** about yourself and the AI news you'll cover.\n"
-    f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog.\n\n"
+    f"3. Start the blog post with a **short, fun, and sarcastic introduction** where you subtly question the hype around AI news (you know, the 'what’s new this week?' vibe).\n"
+    f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog, with a touch of skepticism about the latest AI innovations.\n\n"
     f"### Guidelines:\n"
-    f"- Focus on **readability** and an engaging **storytelling approach**.\n"
-    f"- Maintain a **conversational yet informative tone**.\n"
-    f"- Highlight **the most important AI developments** in a structured format.\n"
-    f"- Make the post **flow naturally** instead of just summarizing bullet points.\n"
-    f"- If possible, include an insightful closing statement or takeaway.\n\n"
+    f"- Focus on **readability** and an engaging **storytelling approach**. Don't just regurgitate what’s in the newsletters, make it *worth reading*.\n"
+    f"- Maintain a **conversational yet informative tone**, with a sprinkle of **dark humor**—think of yourself as the AI equivalent of a skeptical, slightly jaded tech reviewer.\n"
+    f"- **Skepticism is key**: Question new developments, make sarcastic remarks about *'game-changing'* claims, and call out the obvious hype surrounding AI projects.\n"
+    f"- Highlight **the most important AI developments** in a structured format, but avoid sounding like a marketing brochure.\n"
+    f"- Make the post **flow naturally** instead of just summarizing bullet points. Don't make it feel like a boring corporate memo.\n"
+    f"- If possible, include an **insightful closing statement or takeaway**, but keep it snarky and reflective—nothing too warm and fuzzy.\n\n"
     f"### Response Format:\n"
     f"Generate the response as a structured YAML document with the following format:\n"
     f"```yaml\n"
-    f"subtitle: \"A short, engaging one-liner summarizing the blog post\"\n"
-    f"description: \"A concise, engaging summary of the blog post (2-3 sentences)\"\n"
+    f"subtitle: \"A short, engaging one-liner summarizing the blog post, with a hint of skepticism\"\n"
+    f"description: \"A concise, engaging summary of the blog post (2-3 sentences) with a touch of dark humor or sarcasm about AI trends\"\n"
     f"content: |\n"
     f"  <h1>Weekly AI News Summary</h1>\n"
     f"  \n"
     f"  <h2>[Subtitle Here]</h2>\n"
     f"  \n"
     f"  <p>[Introduction]</p>\n"
+    f"  <p>Here's the latest in AI: *new* breakthroughs, *exciting* advancements, and *game-changing* products. Or at least that’s what the press releases say. Let's dive in, shall we?</p>\n"
     f"  \n"
     f"  <h2>[Subheading]</h2>\n"
-    f"  <p>[Paragraph about AI news]</p>\n"
+    f"  <p>[Paragraph about AI news, add skeptical comments like 'And of course, they’re promising it’s the next big thing… who’s surprised?']</p>\n"
     f"  \n"
     f"  <h2>[Another Subheading]</h2>\n"
-    f"  <p>[More AI news]</p>\n"
+    f"  <p>[More AI news, with sarcastic remarks like 'Is this another AI tool that will change the world? Probably not. But let's pretend it will.']</p>\n"
     f"  \n"
-    f"  <p>[Closing statement]</p>\n"
+    f"  <p>[Another AI news piece, as many as needed. Feel free to add as many sections as necessary for the volume of news. Each piece of news should get its own heading and paragraph.]</p>\n"
+    f"  \n"
+    f"  <p>[Closing statement] - [Something like: 'Will any of this actually make a real difference? Time will tell. But don’t hold your breath.']</p>\n"
     f"```\n"
     f"Ensure the `content` field contains properly formatted HTML elements, including `<h1>`, `<h2>`, and `<p>`, without bullet points unless necessary.\n\n"
     f"{body}"
-    )
+)
+
+
 
     try:
         response = client.chat.completions.create(
@@ -108,7 +167,8 @@ def create_blogpost(emails: list) -> BlogPost:
         cleaned_response = response_with_backticks.strip('```yaml').strip('```')
         # TODO Running into an issue with ´´´yaml, the response starts and ends with ´´´ . Which causes an error when parsing the YAML, but we need this for our markdown file. So we need to remove it before parsing and later add it back when creating our markdown file
         blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, [email.sender_name for email in emails])
-
+        
+        
         newly_created_blogpost = database.db_operations.insert_blogpost(blogpost)
         
         return newly_created_blogpost
@@ -166,12 +226,13 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         image="img/backgroundLaos.jpg",  # TODO Add image later, figure out if we wanna use AI-generated images
         slug=None
     )
+    
     blogpost = BlogPost(
         created_at=datetime.now(),
         published_at=None,
         content=parsed_data["content"],
         email_count=amount_of_emails, 
-        newsletter_sources=newsletter_sources, 
+        newsletter_sources=json.dumps(newsletter_sources), 
         word_count=len(remove_html_elements(parsed_data["content"])), 
         openai_model=model,
         tokens_used=amount_of_tokens, 
@@ -181,6 +242,7 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         prompt_used=prompt,
         blogpost_metadata=metadata
     )
+    print("get here?")  
 
     return blogpost
 
@@ -189,17 +251,20 @@ def remove_html_elements(html_content: str) -> str:
     soup = BeautifulSoup(html_content, "html.parser")
     return soup.get_text()
 
-def generate_markdown_file(blogpostDTO: BlogPostDTO):
+def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
     """Generate a markdown file from a Blogpost object"""
     try:
-        # Ensure output directory exists
-        markdown_path = os.getenv("MARKDOWN_PATH")
-        os.makedirs(markdown_path, exist_ok=True)
+        # Get the current directory of the script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        REPO_NAME = os.getenv("REPO_NAME")
+        # Construct the relative path to the target directory
+        target_dir = os.path.join(current_dir, f'../../{REPO_NAME}/content/posts')
+        target_dir = os.path.abspath(target_dir)  # Ensure absolute path
 
         # Define filename
         slug = blogpostDTO.blogpost_metadata.slug
         filename = f"{slug}.md"
-        filepath = os.path.join(markdown_path, filename)
+        filepath = os.path.join(target_dir, filename)
 
         # Create front matter (YAML metadata)
         front_matter = {
@@ -212,12 +277,12 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO):
             "slug": format_front_matter_value(blogpostDTO.blogpost_metadata.slug),
             "description": format_front_matter_value(blogpostDTO.blogpost_metadata.description)
         }
-        #print values of front matter
-        print("Values of front matter")
-        print(front_matter)
+        NoQuotesForDatesDumper.add_representer(str, NoQuotesForDatesDumper.represent_str)
+        NoQuotesForDatesDumper.add_representer(datetime, NoQuotesForDatesDumper.represent_datetime)
 
-        # Convert front matter to YAML format
-        front_matter_yaml = yaml.dump(front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True, default_style='"', width=float('inf'))
+        
+        # Convert front matter to YAML format, width=float('inf') ensures no line breaks
+        front_matter_yaml = yaml.dump(front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True, width=float('inf'), Dumper=NoQuotesForDatesDumper)
 
         # Write Markdown file
         with open(filepath, "w", encoding="utf-8") as file:
@@ -226,7 +291,12 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO):
             file.write("---\n\n")
             file.write(blogpostDTO.content)
 
-        return filepath
+        # Update the file path in the BlogPostDTO object
+        blogpostDTO.markdown_file_path = filepath
+        # Update the status of the blogpost to be MARKDOWN-CREATED
+        blogpostDTO.status = BlogPostStatus.MARKDOWN_CREATED
+
+        return blogpostDTO
     except Exception as e:
         print(f"An error occurred during the generation of the markdown file: {e}")
         return None
@@ -240,27 +310,20 @@ def format_front_matter_value(value):
     - None values become empty strings.
     """
     
-    print(f"Type of value: {type(value)}")
     if isinstance(value, datetime):
         # Ensure the date is formatted correctly: YYYY-MM-DD
-        print(f"Value is a datetime to str hopefully: {value.strftime("%Y-%m-%d")}")
-        return value.strftime("%Y-%m-%d")
+
+        return value
     elif isinstance(value, str):
-        
-        # If the string starts and ends with single quotes, remove them
-        if value.startswith("'") and value.endswith("'"):
-            value = value.replace("'", "’")  # Replace single quotes with typographic apostrophes
-            return value[1:-1]
-        if value.startswith('"') and value.endswith('"'):
-            value = value.replace("'", "’")  # Replace single quotes with typographic apostrophes
-            return value[1:-1]
+        # Preserve original single quotes, only wrap in double quotes if needed
+        # if ":" in value or "\n" in value:  
+        #     return f'"{value}"'  # Wrap if contains colons or newlines
+        return value  # Otherwise, return as-is
     elif isinstance(value, list):
-        return json.dumps(value)  # Ensure list is properly converted
+        return value  # Let PyYAML handle lists correctly
     elif value is None:
         return ""  # Handle None values as empty string
     return value  
-
-
 
 # TODO Analyse OpenAI's response if it contains everything we need for the blog post
 # TODO If it does, we can proceed to save it in the database
