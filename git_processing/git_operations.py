@@ -4,13 +4,29 @@ import time
 import requests
 
 def run_git_command(command, cwd):
-    """Runs a Git command and handles errors."""
+    """Runs a Git command and handles errors using Popen."""
     try:
-        subprocess.run(command, check=True, cwd=cwd)
-    except subprocess.CalledProcessError as e:
-        print(f"Git command failed: {command} -> {e}")
+        process = subprocess.Popen(
+            command,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",  # Ensure proper encoding
+            errors="replace"  # Prevent crashes from bad characters
+        )
+
+        stdout, stderr = process.communicate()  # Wait for the command to complete
+
+        if process.returncode != 0:  # Check for errors
+            print(f"Git command failed: {command} -> {stderr.strip()}")
+            return False
+
+        return stdout.strip()  # Return command output if successful
+
+    except Exception as e:
+        print(f"Error running Git command {command}: {e}")
         return False
-    return True
 
 def check_git_changes(repo_path):
     """Check if there are any uncommitted changes in the repository."""
@@ -38,8 +54,18 @@ def commit_and_push_to_github(BlogpostDTO):
     repo_url_with_token = repo_url.replace("https://", f"https://{GITHUB_TOKEN}@")
     run_git_command(['git', 'remote', 'set-url', 'origin', repo_url_with_token], blog_repo_path)
 
+    # Stash any local changes before switching branches
+    if check_git_changes(blog_repo_path):
+        print("Uncommitted changes detected! Stashing changes before switching branches.")
+        run_git_command(["git", "stash"], blog_repo_path)
+
     run_git_command(["git", "checkout", "develop"], blog_repo_path)
     run_git_command(["git", "pull", "origin", "develop"], blog_repo_path)
+
+    # After pulling changes, restore stashed changes if necessary
+    if "No local changes to save" not in run_git_command(["git", "stash", "list"], blog_repo_path):
+        print("Restoring stashed changes...")
+        run_git_command(["git", "stash", "pop"], blog_repo_path)
 
     if not check_git_changes(blog_repo_path):
         print("No new changes detected. Skipping commit.")
@@ -54,7 +80,6 @@ def commit_and_push_to_github(BlogpostDTO):
     existing_pr_number = check_existing_pr()
     if existing_pr_number:
         print(f"Existing PR found: #{existing_pr_number}. Attempting to merge...")
-        merge_pull_request(existing_pr_number)
         return existing_pr_number
 
     return create_pull_request(slug)
@@ -121,9 +146,9 @@ def merge_pull_request(pr_number):
     pr_data = pr_response.json()
 
     attempts = 0
-    while pr_data.get("mergeable_state") == "unknown" and attempts < 5:
+    while pr_data.get("mergeable_state") == "unknown" and attempts < 10:
         print("Waiting for GitHub to calculate mergeability...")
-        time.sleep(5)
+        time.sleep(10)
         pr_response = requests.get(pr_url, headers=headers)
         pr_data = pr_response.json()
         attempts += 1
@@ -136,8 +161,16 @@ def merge_pull_request(pr_number):
         if merge_response.status_code == 200:
             print("Pull request merged successfully!")
 
+            if check_git_changes(blog_repo_path):
+                print("Uncommitted changes detected! Stashing changes before switching branches.")
+                run_git_command(["git", "stash"], blog_repo_path)
+
             run_git_command(["git", "checkout", "master"], blog_repo_path)
             run_git_command(["git", "pull", "origin", "master"], blog_repo_path)
+
+            if "No local changes to save" not in run_git_command(["git", "stash", "list"], blog_repo_path):
+                print("Restoring stashed changes...")
+                run_git_command(["git", "stash", "pop"], blog_repo_path)
 
             print("Master branch is up to date after PR merge.")
             return
@@ -146,11 +179,20 @@ def merge_pull_request(pr_number):
 
     print(f"PR cannot be merged due to: {pr_data.get('mergeable_state')}. Attempting force merge...")
 
+    if check_git_changes(blog_repo_path):
+        print("Uncommitted changes detected! Stashing changes before switching branches.")
+        run_git_command(["git", "stash"], blog_repo_path)
+
     run_git_command(["git", "checkout", "master"], blog_repo_path)
     run_git_command(["git", "pull", "--rebase", "origin", "master"], blog_repo_path)
 
-    status_output = subprocess.run(["git", "diff", "master", "develop"], cwd=blog_repo_path, capture_output=True, text=True)
-    if not status_output.stdout.strip():
+    # After pulling changes, restore stashed changes if necessary
+    if "No local changes to save" not in run_git_command(["git", "stash", "list"], blog_repo_path):
+        print("Restoring stashed changes...")
+        run_git_command(["git", "stash", "pop"], blog_repo_path)
+
+    status_output = subprocess.run(["git", "diff", "master", "develop"], cwd=blog_repo_path, capture_output=True, text=True, encoding="utf-8")
+    if status_output.stdout is None or not status_output.stdout.strip():
         print("No new changes to merge. Skipping force merge.")
         return
 

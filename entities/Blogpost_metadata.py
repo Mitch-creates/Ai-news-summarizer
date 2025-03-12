@@ -12,7 +12,6 @@ class BlogPostMetadata(Base):
 
     id: int = Column(Integer, primary_key=True, autoincrement=True)
     title: str = Column(String, nullable=False)
-    subtitle: str = Column(String)
     date: datetime = Column(DateTime, nullable=False)
     description: str = Column(String, nullable=False)
     author: str = Column(String, nullable=False)

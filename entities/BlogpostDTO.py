@@ -9,7 +9,6 @@ from enums.blogpost_status import BlogPostStatus
 class BlogPostMetadataDTO:
     id: Optional[int]
     title: str
-    subtitle: Optional[str]
     date: Optional[datetime]
     description: Optional[str]
     author: Optional[str]
@@ -21,7 +20,6 @@ class BlogPostMetadataDTO:
         return BlogPostMetadataDTO(
             id=metadata.id,
             title=metadata.title,
-            subtitle=metadata.subtitle,
             date=metadata.date,
             description=metadata.description,
             author=metadata.author,
@@ -34,7 +32,6 @@ class BlogPostMetadataDTO:
         return BlogPostMetadata(
             id=self.id,
             title=self.title,
-            subtitle=self.subtitle,
             date=self.date,
             description=self.description,
             author=self.author,

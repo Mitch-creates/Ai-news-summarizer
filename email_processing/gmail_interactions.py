@@ -44,12 +44,6 @@ def create_email_object(subject, body, sender_name, sender_email, date, gmail_id
         gmail_id=gmail_id)
     return email_obj
 
-def store_each_email_in_db(email_content):
-    """Stores each email in the database."""
-
-def check_for_duplicate_email_ids(email_ids):
-    """Checks for duplicate email IDs in the database."""
-
 def get_email_content(service, user_id, email_id):
     """Fetches and decodes the email content."""
     message = service.users().messages().get(userId=user_id, id=email_id, format="full").execute()
@@ -65,7 +59,10 @@ def get_email_content(service, user_id, email_id):
 
     body_without_emojis = remove_emojis(extracted_body)
 
-    return subject, body_without_emojis, sender_name, sender_email, date, email_id
+    cleaned_body = clean_newsletter_body(body_without_emojis)
+    print(f"LENGTH BEFORE AFTER:{len(body_without_emojis)} {len(cleaned_body)}")
+
+    return subject, cleaned_body, sender_name, sender_email, date, email_id
 
 def extract_email_body(payload):
     """Extracts email body, prioritizing text/plain but falling back to text/html."""
@@ -82,6 +79,28 @@ def extract_email_body(payload):
     elif "body" in payload and "data" in payload["body"]:
         return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
     return "No content found."
+
+def clean_newsletter_body(text):
+    """Cleans up the newsletter content by removing unnecessary elements like links, ads, and tracking info."""
+    # Remove URLs
+    text = re.sub(r'http[s]?://\S+', '', text)
+    
+    # Remove promotional text and subscription-related sections
+    text = re.sub(r'\b(SIGN UP|ADVERTISE|VIEW ONLINE|GET STARTED HERE|APPLY HERE|TRACK YOUR REFERRALS|SHARE YOUR REFERRAL LINK|MANAGE YOUR SUBSCRIPTIONS|UNSUBSCRIBE)\b.*', '', text, flags=re.IGNORECASE)
+
+    # Remove sponsor mentions (e.g., "TOGETHER WITH [Regal]")
+    text = re.sub(r'\b(TOGETHER WITH|SPONSORED BY|SPONSOR)\b.*', '', text, flags=re.IGNORECASE)
+
+    # Remove phone numbers
+    text = re.sub(r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b', '', text)
+
+    # Remove excessive whitespace
+    text = re.sub(r'\n\s*\n', '\n', text)
+
+    # Remove citations like [10], [25], etc.
+    text = re.sub(r'\[\d+\]', '', text)
+
+    return text.strip()
 
 def mark_email_as_read(service, user_id, email_id):
     """Marks an email as read by removing the UNREAD label."""

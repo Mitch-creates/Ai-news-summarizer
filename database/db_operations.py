@@ -203,7 +203,6 @@ def update_blogpost(post_id, blogpost):
                 # Update the existing `blogpost_metadata` fields instead of replacing the object
                 existing_blogpost.blogpost_metadata.title = blogpost.blogpost_metadata.title
                 existing_blogpost.blogpost_metadata.slug = blogpost.blogpost_metadata.slug
-                existing_blogpost.blogpost_metadata.subtitle = blogpost.blogpost_metadata.subtitle
                 existing_blogpost.blogpost_metadata.date = blogpost.blogpost_metadata.date
                 existing_blogpost.blogpost_metadata.description = blogpost.blogpost_metadata.description
                 existing_blogpost.blogpost_metadata.author = blogpost.blogpost_metadata.author

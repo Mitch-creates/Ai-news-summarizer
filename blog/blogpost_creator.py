@@ -125,13 +125,9 @@ def create_blogpost(emails: list) -> BlogPostDTO:
     f"- If possible, include an **insightful closing statement or takeaway**, but keep it snarky and reflective—nothing too warm and fuzzy.\n\n"
     f"### Response Format:\n"
     f"Generate the response as a structured YAML document with the following format:\n"
-    f"```yaml\n"
-    f"subtitle: \"A short, engaging one-liner summarizing the blog post, with a hint of skepticism\"\n"
     f"description: \"A concise, engaging summary of the blog post (2-3 sentences) with a touch of dark humor or sarcasm about AI trends\"\n"
     f"content: |\n"
-    f"  <h1>Weekly AI News Summary</h1>\n"
-    f"  \n"
-    f"  <h2>[Subtitle Here]</h2>\n"
+    f"  <h2>[Subheading]</h2>\n"
     f"  \n"
     f"  <p>[Introduction]</p>\n"
     f"  <p>Here's the latest in AI: *new* breakthroughs, *exciting* advancements, and *game-changing* products. Or at least that’s what the press releases say. Let's dive in, shall we?</p>\n"
@@ -145,7 +141,6 @@ def create_blogpost(emails: list) -> BlogPostDTO:
     f"  <p>[Another AI news piece, as many as needed. Feel free to add as many sections as necessary for the volume of news. Each piece of news should get its own heading and paragraph.]</p>\n"
     f"  \n"
     f"  <p>[Closing statement] - [Something like: 'Will any of this actually make a real difference? Time will tell. But don’t hold your breath.']</p>\n"
-    f"```\n"
     f"Ensure the `content` field contains properly formatted HTML elements, including `<h1>`, `<h2>`, and `<p>`, without bullet points unless necessary.\n\n"
     f"{body}"
 )
@@ -212,14 +207,13 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
     parsed_data = parse_yaml_response(response)
 
     # Validate required fields
-    required_fields = ["subtitle", "description", "content"]
+    required_fields = ["description", "content"]
     for field in required_fields:
         if field not in parsed_data:
             raise ValueError(f"Missing required field in response: {field}")
 
     metadata = BlogPostMetadata(
-        title=os.getenv("WEEKLY_AI_TITLE"),
-        subtitle=parsed_data["subtitle"],
+        title=f"{os.getenv('WEEKLY_AI_TITLE')} - Week {datetime.now().isocalendar()[1]}",
         date=datetime.now(),
         description=parsed_data["description"],
         author="AI",
@@ -242,7 +236,6 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         prompt_used=prompt,
         blogpost_metadata=metadata
     )
-    print("get here?")  
 
     return blogpost
 
@@ -270,7 +263,6 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
         front_matter = {
             "layout": "post",
             "title": format_front_matter_value(blogpostDTO.blogpost_metadata.title),
-            "subtitle": format_front_matter_value(blogpostDTO.blogpost_metadata.subtitle),
             "date": format_front_matter_value(blogpostDTO.blogpost_metadata.date),
             "author": format_front_matter_value(blogpostDTO.blogpost_metadata.author),
             "image": format_front_matter_value(blogpostDTO.blogpost_metadata.image),
