@@ -174,18 +174,6 @@ def update_blogpost_status(post_id, new_status):
             blogpost.status = new_status
             session.commit()
             session.refresh(blogpost)
-            #Check if newsletter_sources and tags are of type list
-        if isinstance(blogpost.newsletter_sources, list):
-            print("newsletter_sources on line 165 is a list")
-        else:
-            print("newsletter_sources on line 165 is not a list")
-
-        if isinstance(blogpost.tags, list):
-            print("tags on line 165 is a list")
-        else:
-            print("tags on line 165 is not a list")
-
-
     return BlogPostDTO.from_orm(blogpost)
 
 #TODO figure out where changing between string and datetime will be necessary
@@ -197,6 +185,10 @@ def update_blogpost(post_id, blogpost):
         existing_blogpost = session.query(BlogPost).options(
             joinedload(BlogPost.blogpost_metadata)
         ).filter(BlogPost.id == post_id).first()
+
+        if not existing_blogpost:
+            print(f"No blog post found with id {post_id}")
+            return None
 
         if hasattr(blogpost, 'blogpost_metadata') and blogpost.blogpost_metadata:
             if existing_blogpost.blogpost_metadata:
@@ -217,9 +209,6 @@ def update_blogpost(post_id, blogpost):
         for key, value in vars(blogpost).items():
             if key == 'blogpost_metadata':
                 continue
-            #     continue  # Skip updating the relationship field
-            # Debug: print each key and value
-            #print(f"Updating field '{key}' to value: {value}")
             if key == 'newsletter_sources' and isinstance(value, list):
                 value = json.dumps(value)  # Convert list to JSON string
             if key == 'tags' and isinstance(value, list):
@@ -227,9 +216,6 @@ def update_blogpost(post_id, blogpost):
             if key in ['created_at', 'published_at'] and isinstance(value, str):
                 value = convert_date(value)  # Convert string to datetime
             setattr(existing_blogpost, key, value)
-        
-        # Debug before merging the blogpost
-        blogpost_before = id(existing_blogpost)
         
         # Reattach the blogpost using merge
         merged_blogpost = session.merge(existing_blogpost)

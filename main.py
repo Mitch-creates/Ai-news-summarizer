@@ -54,13 +54,13 @@ def main():
     
    
     newly_created_blogpost = create_blogpost(emails)
-    blogpostdto = generate_markdown_file(newly_created_blogpost)
-    updated_blogpost = db_operations.update_blogpost(blogpostdto.id, blogpostdto)
+    # blogpostdto = generate_markdown_file(newly_created_blogpost)
+    # updated_blogpost = db_operations.update_blogpost(blogpostdto.id, blogpostdto)
 
-    # # print(blogpostdto)
+    # # # print(blogpostdto)
 
-    pr_number = commit_and_push_to_github(updated_blogpost)
-    merge_pull_request(pr_number)
+    # pr_number = commit_and_push_to_github(updated_blogpost)
+    # merge_pull_request(pr_number)
 
 
 if __name__ == "__main__":

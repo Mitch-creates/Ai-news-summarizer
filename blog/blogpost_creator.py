@@ -13,6 +13,7 @@ from entities.Blogpost import BlogPost
 from entities.BlogpostDTO import BlogPostDTO
 from entities.Blogpost_metadata import BlogPostMetadata
 from enums.blogpost_status import BlogPostStatus
+from enums.blogpost_mood import BlogPostMood  # Add this line to import BlogPostMoods
 import database.db_operations
 
 # Load environment variables
@@ -47,131 +48,114 @@ class NoQuotesForDatesDumper(yaml.SafeDumper):
 def create_blogpost(emails: list) -> BlogPostDTO:
     """Summarizes the email body using OpenAI's GPT-3.5 model."""
     body = format_email_body_for_openai(emails)
+    moods = [BlogPostMood.PROFESSIONAL, BlogPostMood.HUMOROUS, BlogPostMood.SKEPTICAL]
 
-    # prompt = (
-    #     f"You are an AI-powered blog writer specializing in AI news. Below is a collection of AI-related newsletters from the past week.\n\n"
-    #     f"### Task:\n"
-    #     f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news.\n"
-    #     f"2. **Extract key insights** from the remaining newsletters and merge them into a structured, engaging, and easy-to-read blog post.\n"
-    #     f"3. Start the blog post with a **short, fun, and engaging introduction** about yourself and the AI news you'll cover.\n"
-    #     f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog.\n\n"
-    #     f"### Guidelines:\n"
-    #     f"- Focus on **readability** and an engaging **storytelling approach**.\n"
-    #     f"- Maintain a **conversational yet informative tone**.\n"
-    #     f"- Highlight **the most important AI developments** in a structured format.\n"
-    #     f"- Make the post **flow naturally** instead of just summarizing bullet points.\n"
-    #     f"- If possible, include an insightful closing statement or takeaway.\n\n"
-    #     f"### Metadata:\n"
-    #     f"Please also generate the following metadata for the blog post:\n"
-    #     f"- **title**: \"Weekly AI News Summary\"\n"
-    #     f"- **subtitle**: A short, engaging one-liner summarizing the blog post (e.g., \"The biggest AI breakthroughs this week!\")\n"
-    #     f"- **date**: Use today’s date\n"
-    #     f"- **author**: \"AI\"\n"
-    #     f"- **image**: Leave blank\n"
-    #     f"- **slug**: \"ai-news\"\n"
-    #     f"- **description**: A concise, engaging summary of the blog post (2-3 sentences).\n\n"
-    #     f"### Newsletters:\n"
-    #     f"{body}"
-    # )
+    prompt = f"""
+You are an AI-powered blog writer specializing in **AI news**. Your goal is to craft **AMOUNT_OF_MOODS full-length, high-quality blog posts** (500-800 words each) summarizing the latest AI developments based on the newsletters provided. 
 
-    # prompt = (f"You are an AI-powered blog writer specializing in AI news. Below is a collection of AI-related newsletters from the past week.\n\n"
-    # f"### Task:\n"
-    # f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news.\n"
-    # f"2. **Extract key insights** from the remaining newsletters and merge them into a structured, engaging, and easy-to-read blog post.\n"
-    # f"3. Start the blog post with a **short, fun, and engaging introduction** about yourself and the AI news you'll cover.\n"
-    # f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog.\n\n"
-    # f"### Guidelines:\n"
-    # f"- Focus on **readability** and an engaging **storytelling approach**.\n"
-    # f"- Maintain a **conversational yet informative tone**.\n"
-    # f"- Highlight **the most important AI developments** in a structured format.\n"
-    # f"- Make the post **flow naturally** instead of just summarizing bullet points.\n"
-    # f"- If possible, include an insightful closing statement or takeaway.\n\n"
-    # f"### Response Format:\n"
-    # f"Generate the response as a structured YAML document with the following format:\n"
-    # f"```yaml\n"
-    # f"subtitle: \"A short, engaging one-liner summarizing the blog post\"\n"
-    # f"description: \"A concise, engaging summary of the blog post (2-3 sentences)\"\n"
-    # f"content: |\n"
-    # f"  <h1>Weekly AI News Summary</h1>\n"
-    # f"  \n"
-    # f"  <h2>[Subtitle Here]</h2>\n"
-    # f"  \n"
-    # f"  <p>[Introduction]</p>\n"
-    # f"  \n"
-    # f"  <h2>[Subheading]</h2>\n"
-    # f"  <p>[Paragraph about AI news]</p>\n"
-    # f"  \n"
-    # f"  <h2>[Another Subheading]</h2>\n"
-    # f"  <p>[More AI news]</p>\n"
-    # f"  \n"
-    # f"  <p>[Closing statement]</p>\n"
-    # f"```\n"
-    # f"Ensure the `content` field contains properly formatted HTML elements, including `<h1>`, `<h2>`, and `<p>`, without bullet points unless necessary.\n\n"
-    # f"{body}"
-    # )
+---
 
-    prompt = (f"You are an AI-powered blog writer specializing in AI news. Below is a collection of AI-related newsletters from the past week.\n\n"
-    f"### Task:\n"
-    f"1. **Analyze each newsletter separately** and **ignore any that are purely advertisements** or have no valuable news (yes, the ones full of buzzwords and no substance).\n"
-    f"2. **Extract key insights** from the remaining newsletters and merge them into a structured, engaging, and easy-to-read blog post.\n"
-    f"3. Start the blog post with a **short, fun, and sarcastic introduction** where you subtly question the hype around AI news (you know, the 'what’s new this week?' vibe).\n"
-    f"4. Ensure the post feels **natural, well-written, and compelling**—like a high-quality human-written blog, with a touch of skepticism about the latest AI innovations.\n\n"
-    f"### Guidelines:\n"
-    f"- Focus on **readability** and an engaging **storytelling approach**. Don't just regurgitate what’s in the newsletters, make it *worth reading*.\n"
-    f"- Maintain a **conversational yet informative tone**, with a sprinkle of **dark humor**—think of yourself as the AI equivalent of a skeptical, slightly jaded tech reviewer.\n"
-    f"- **Skepticism is key**: Question new developments, make sarcastic remarks about *'game-changing'* claims, and call out the obvious hype surrounding AI projects.\n"
-    f"- Highlight **the most important AI developments** in a structured format, but avoid sounding like a marketing brochure.\n"
-    f"- Make the post **flow naturally** instead of just summarizing bullet points. Don't make it feel like a boring corporate memo.\n"
-    f"- If possible, include an **insightful closing statement or takeaway**, but keep it snarky and reflective—nothing too warm and fuzzy.\n\n"
-    f"### Response Format:\n"
-    f"Generate the response as a structured YAML document with the following format:\n"
-    f"description: \"A concise, engaging summary of the blog post (2-3 sentences) with a touch of dark humor or sarcasm about AI trends\"\n"
-    f"content: |\n"
-    f"  <h2>[Subheading]</h2>\n"
-    f"  \n"
-    f"  <p>[Introduction]</p>\n"
-    f"  <p>Here's the latest in AI: *new* breakthroughs, *exciting* advancements, and *game-changing* products. Or at least that’s what the press releases say. Let's dive in, shall we?</p>\n"
-    f"  \n"
-    f"  <h2>[Subheading]</h2>\n"
-    f"  <p>[Paragraph about AI news, add skeptical comments like 'And of course, they’re promising it’s the next big thing… who’s surprised?']</p>\n"
-    f"  \n"
-    f"  <h2>[Another Subheading]</h2>\n"
-    f"  <p>[More AI news, with sarcastic remarks like 'Is this another AI tool that will change the world? Probably not. But let's pretend it will.']</p>\n"
-    f"  \n"
-    f"  <p>[Another AI news piece, as many as needed. Feel free to add as many sections as necessary for the volume of news. Each piece of news should get its own heading and paragraph.]</p>\n"
-    f"  \n"
-    f"  <p>[Closing statement] - [Something like: 'Will any of this actually make a real difference? Time will tell. But don’t hold your breath.']</p>\n"
-    f"Ensure the `content` field contains properly formatted HTML elements, including `<h1>`, `<h2>`, and `<p>`, without bullet points unless necessary.\n\n"
-    f"{body}"
-)
+## **Task Breakdown:**  
+1. **Analyze Each Newsletter Thoughtfully**  
+   - Ignore **promotional content, product announcements, and ads**.  
+   - Focus on meaningful **breakthroughs, controversies, trends, and expert insights**.  
 
+2. **Generate AMOUNT_OF_MOODS High-Quality Blog Posts**  
+   - Each blog post **must cover the same topics** but with a unique **writing style (mood)**.  
+   - Each post should be a **well-structured, fully developed article**—not just a summary.  
+   - The posts should **not be repetitive** but offer a distinct experience in tone and style.
+
+
+## **Writing Styles (Moods):**  
+   MOODS_JSON
+
+---
+
+## **Blog Post Structure:**  
+Each post must include:  
+✅ **A compelling introduction** that draws the reader in.  
+✅ **Clearly structured sections (<h2> and <p>)** covering the AI news topics.  
+✅ **Smooth transitions** between sections to create a natural flow.  
+✅ **No robotic, repetitive, or templated phrasing**—write with personality.  
+✅ **A conclusion with key takeaways and a final insight.**  
+✅ **Engaging storytelling, rather than a dry summary.**  
+
+---
+
+## **Output Format (Strict JSON):**  
+```json
+{{
+    JSON_EXAMPLE
+}}
+"""
+    formatted_prompt = finalize_prompt_with_moods(prompt, moods)
+    #Add the body of the emails to the prompt
+    print(f"Prompt: {formatted_prompt}")
+    final_prompt = f"{formatted_prompt}\n\n{body}"
+      # Debugging statement
 
 
     try:
         response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": final_prompt}],
             model=model,
             max_tokens=1000
         )
         response_with_backticks = response.choices[0].message.content
+        print(f"Response: {response_with_backticks}")  # Debugging statement
 
-        if not isinstance(response_with_backticks, str):
-            raise ValueError("Response is not a valid string.")
+        # ## TODO FIX rest of progress of getting the response, saving and writing the markdown file with new formatting and added fields
+
+        # if not isinstance(response_with_backticks, str):
+        #     raise ValueError("Response is not a valid string.")
         
-        response_with_backticks = response_with_backticks.strip()
-        cleaned_response = response_with_backticks.strip('```yaml').strip('```')
-        # TODO Running into an issue with ´´´yaml, the response starts and ends with ´´´ . Which causes an error when parsing the YAML, but we need this for our markdown file. So we need to remove it before parsing and later add it back when creating our markdown file
-        blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, [email.sender_name for email in emails])
+        # response_with_backticks = response_with_backticks.strip()
+        # cleaned_response = response_with_backticks.strip('```yaml').strip('```')
+        # # TODO Running into an issue with ´´´yaml, the response starts and ends with ´´´ . Which causes an error when parsing the YAML, but we need this for our markdown file. So we need to remove it before parsing and later add it back when creating our markdown file
+        # blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, [email.sender_name for email in emails])
         
         
-        newly_created_blogpost = database.db_operations.insert_blogpost(blogpost)
+        # newly_created_blogpost = database.db_operations.insert_blogpost(blogpost)
         
-        return newly_created_blogpost
+        # return newly_created_blogpost
     except GeneratorExit:
         print("Generator was forcefully closed.")
     except Exception as e:
         print(f"Error in generating blogpost: {e}")
         return "Failed to generate blogpost"
+
+def finalize_prompt_with_moods(prompt: str, moods: list[BlogPostMood]) -> str:
+    """Inserts each mood's value into the prompt."""
+    amount_of_moods = len(moods)
+    prompt = prompt.replace("AMOUNT_OF_MOODS", str(amount_of_moods))
+
+    example_content = (
+        "<h2>Subheading</h2>"
+        "<p>Give an introduction of yourself, being an AI-powered blog writer with a good hook.</p>"
+        "<h2>Subheading</h2>"
+        "<p>More takes on the AI news</p>"
+        "<h2>Subheading</h2>"
+        "<p>More analysis...</p>"
+        "<h2>Subheading</h2>"
+        "<p>A fitting ending</p>"
+    )
+
+    mood_descriptions = "\n".join([
+        f'- **{mood.mood_name}**: {mood.instruction}' for mood in moods])
+    
+    json_example = {
+        "descriptions": {mood.mood_name: f"Create a concise description of the content following the instructions for the {mood.mood_name} writing style." for mood in moods},
+        "content": {mood.mood_name: example_content for mood in moods}
+    }
+
+    json_example_str = json.dumps(json_example, indent=4)
+    prompt = prompt.replace("MOODS_JSON", mood_descriptions)
+    prompt = prompt.replace("JSON_EXAMPLE", json_example_str)
+
+    return prompt
+
+
+
 
 def format_email_body_for_openai(emails: list) -> str:
     """Takes the needed data and structures it for OpenAI processing."""

@@ -10,7 +10,7 @@ class BlogPostMetadataDTO:
     id: Optional[int]
     title: str
     date: Optional[datetime]
-    description: Optional[str]
+    description: Optional[dict]
     author: Optional[str]
     image: Optional[str]
     slug: Optional[str]
@@ -44,15 +44,15 @@ class BlogPostDTO:
     id: int
     created_at: Optional[datetime]
     published_at: Optional[datetime]
-    content: str
+    content: dict
     email_count: int
-    newsletter_sources: List[str]
+    newsletter_sources: List[str] # Assuming JSON is a list of strings
     word_count: int
     openai_model: str
     tokens_used: int
     markdown_file_path: Optional[str]
     status: str
-    tags: List[str]
+    tags: List[str] # Assuming JSON is a list of strings
     prompt_used: Optional[str]
     blogpost_metadata: Optional[BlogPostMetadataDTO] = None  # Default to None
 
@@ -66,13 +66,13 @@ class BlogPostDTO:
             published_at=blogpost.published_at,
             content=blogpost.content,
             email_count=blogpost.email_count,
-            newsletter_sources=json.loads(blogpost.newsletter_sources) if blogpost.newsletter_sources else [],
+            newsletter_sources=blogpost.newsletter_sources,
             word_count=blogpost.word_count,
             openai_model=blogpost.openai_model,
             tokens_used=blogpost.tokens_used,
             markdown_file_path=blogpost.markdown_file_path,
             status=blogpost.status.value,  # Assuming BlogPostStatus is an Enum
-            tags=json.loads(blogpost.tags) if blogpost.tags else [],
+            tags=blogpost.tags,
             prompt_used=blogpost.prompt_used,
             blogpost_metadata=BlogPostMetadataDTO.from_orm(blogpost.blogpost_metadata) if blogpost.blogpost_metadata else None
         )
@@ -85,13 +85,13 @@ class BlogPostDTO:
             published_at=self.published_at,
             content=self.content,
             email_count=self.email_count,
-            newsletter_sources=json.dumps(self.newsletter_sources),
+            newsletter_sources=self.newsletter_sources,
             word_count=self.word_count,
             openai_model=self.openai_model,
             tokens_used=self.tokens_used,
             markdown_file_path=self.markdown_file_path,
             status=BlogPostStatus(self.status),  # If this is an enum, you'll need to convert appropriately
-            tags=json.dumps(self.tags),
+            tags=self.tags,
             prompt_used=self.prompt_used,
         )
         if self.blogpost_metadata:
