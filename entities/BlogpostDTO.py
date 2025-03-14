@@ -4,6 +4,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from enums.blogpost_status import BlogPostStatus
+from enums.blogpost_subject import BlogPostSubject
 
 @dataclass
 class BlogPostMetadataDTO:
@@ -52,6 +53,7 @@ class BlogPostDTO:
     tokens_used: int
     markdown_file_path: Optional[str]
     status: str
+    blogpost_subject: str
     tags: List[str]
     prompt_used: Optional[str]
     blogpost_metadata: Optional[BlogPostMetadataDTO] = None  # Default to None
@@ -59,7 +61,6 @@ class BlogPostDTO:
     @staticmethod
     def from_orm(blogpost) -> "BlogPostDTO":
         """Converts a SQLAlchemy BlogPost instance into a BlogPostDTO."""
-        print(f"Michiel{type(blogpost.newsletter_sources)}")
         return BlogPostDTO(
             id=blogpost.id,
             created_at=blogpost.created_at,
@@ -74,6 +75,7 @@ class BlogPostDTO:
             status=blogpost.status.value,  # Assuming BlogPostStatus is an Enum
             tags=json.loads(blogpost.tags) if blogpost.tags else [],
             prompt_used=blogpost.prompt_used,
+            blogpost_subject=blogpost.blogpost_subject.value,  # Assuming BlogPostSubject is an Enum
             blogpost_metadata=BlogPostMetadataDTO.from_orm(blogpost.blogpost_metadata) if blogpost.blogpost_metadata else None
         )
 
@@ -90,9 +92,10 @@ class BlogPostDTO:
             openai_model=self.openai_model,
             tokens_used=self.tokens_used,
             markdown_file_path=self.markdown_file_path,
-            status=BlogPostStatus(self.status),  # If this is an enum, you'll need to convert appropriately
+            status=BlogPostStatus[self.status],  # If this is an enum, you'll need to convert appropriately
             tags=json.dumps(self.tags),
             prompt_used=self.prompt_used,
+            blogpost_subject=BlogPostSubject[self.blogpost_subject],  # If this is an enum, you'll need to convert appropriately
         )
         if self.blogpost_metadata:
             blogpost.blogpost_metadata = self.blogpost_metadata.to_orm()

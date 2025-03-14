@@ -1,24 +1,15 @@
 import os
 import pickle
-import google.auth
-import webbrowser
 import logging
+import webbrowser
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# Enable debugging logs
-logging.basicConfig(level=logging.DEBUG)
-
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]  # Update with required scopes
 
 def authenticate_gmail():
-    print("Starting Gmail authentication...")  # Debugging statement
+    print("Starting Gmail authentication...")
     creds = None
-
-    # Register Chrome as default browser
-    chrome_path = "C:/Program Files/Google/Chrome/Application/chrome.exe %s"
-    webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
 
     if os.path.exists("token.pickle"):
         print("Found existing token.pickle file. Loading credentials...")
@@ -27,16 +18,22 @@ def authenticate_gmail():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            print("Refreshing expired credentials...")
-            creds.refresh(Request())
-        else:
+            try:
+                print("Refreshing expired credentials...")
+                creds.refresh(Request())
+                print("Token refreshed successfully!")
+            except Exception as e:
+                logging.error(f"Error refreshing token: {e}")
+                print("Could not refresh token, re-authenticating...")
+                creds = None  # Force new authentication
+        if not creds:
             print("No valid credentials found. Opening browser for authentication...")
             try:
                 flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-                creds = flow.run_local_server(port=0, open_browser=True)  # Opens browser for login
+                creds = flow.run_local_server(port=0, open_browser=True)
             except Exception as e:
                 logging.error(f"Error during authentication: {e}")
-                return
+                return None
 
         with open("token.pickle", "wb") as token:
             pickle.dump(creds, token)

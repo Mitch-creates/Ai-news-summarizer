@@ -9,6 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from enums.blogpost_status import BlogPostStatus
 from sqlalchemy import Enum as SqlAlchemyEnum
 from database.base import Base
+from enums.blogpost_subject import BlogPostSubject
 
 @dataclass
 class BlogPost(Base):
@@ -24,9 +25,10 @@ class BlogPost(Base):
     openai_model = Column(String, nullable=False)
     tokens_used = Column(Integer, nullable=False)
     markdown_file_path = Column(String)
-    status = Column(SqlAlchemyEnum(BlogPostStatus), nullable=False)  # ForeignKey to your Enum table (assuming it's stored in DB)
+    status = Column(SqlAlchemyEnum(BlogPostStatus, name="blogpost_status"), nullable=False)  # ForeignKey to your Enum table (assuming it's stored in DB)
     tags = Column(String)  # Storing list as an array (use PostgreSQL)
     prompt_used = Column(String)
+    blogpost_subject = Column(SqlAlchemyEnum(BlogPostSubject, name="blogpost_subject"), nullable=False)  # ForeignKey to your Enum table (assuming it's stored in DB)
     blogpost_metadata_id = Column(Integer, ForeignKey('blog_post_metadata.id'))  # ForeignKey to BlogPostMetadata
 
     # Relationship with BlogPostMetadata

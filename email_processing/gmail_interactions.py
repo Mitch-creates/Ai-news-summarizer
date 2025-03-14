@@ -16,8 +16,8 @@ GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 
 def fetch_emails(service, newsletters):
     """Fetches AI newsletter emails from the last 7 days and summarizes them."""
-    query = ' OR '.join([f'from:{sender[0]}' for sender in newsletters if isinstance(sender[0], str) and '@' in sender[0]]) + ' newer_than:7d'  # Fetch last 7 days
-    # print(f"Constructed Query: {query}")  # Debugging statement
+    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:7d'  # Fetch last 7 days
+    print(f"Constructed Query: {query}")  # Debugging statement
     results = service.users().messages().list(userId="me", q=query).execute()
     # Fetch the list of messages
     messages = results.get("messages", [])
@@ -60,7 +60,6 @@ def get_email_content(service, user_id, email_id):
     body_without_emojis = remove_emojis(extracted_body)
 
     cleaned_body = clean_newsletter_body(body_without_emojis)
-    print(f"LENGTH BEFORE AFTER:{len(body_without_emojis)} {len(cleaned_body)}")
 
     return subject, cleaned_body, sender_name, sender_email, date, email_id
 

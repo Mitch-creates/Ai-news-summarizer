@@ -9,6 +9,7 @@ from enums.blogpost_status import BlogPostStatus
 from enums.gmail_labels import GmailLabels
 from enums.newsletters import Newsletters
 from datetime import datetime
+import re
 from entities.Email import Email
 from entities.Blogpost import BlogPost
 from entities.Blogpost_metadata import BlogPostMetadata
@@ -103,7 +104,6 @@ def insert_blogpost(blogpost):
     if isinstance(blogpost.created_at, str):
         blogpost.created_at = convert_date(blogpost.created_at)
 
-    print(f"Before Converted newsletter_sources to string: {blogpost.newsletter_sources} (type: {type(blogpost.newsletter_sources)})")
     if isinstance(blogpost.newsletter_sources, list):
         blogpost.newsletter_sources = json.dumps(blogpost.newsletter_sources)  # Convert list to JSON string
 
@@ -115,8 +115,6 @@ def insert_blogpost(blogpost):
         session.commit()
         session.refresh(blogpost)
 
-        print(f"Blog post after commit: {blogpost.blogpost_metadata}")
-
         if blogpost.blogpost_metadata:
             _ = blogpost.blogpost_metadata
             session.refresh(blogpost.blogpost_metadata)
@@ -125,21 +123,12 @@ def insert_blogpost(blogpost):
             blogpost.blogpost_metadata.slug = generate_next_slug(blogpost)
             session.commit()
             session.refresh(blogpost.blogpost_metadata)
-        if isinstance(blogpost.newsletter_sources, list):
-            print("newsletter_sources on line 135 is a list")
-        else:
-            print("newsletter_sources on line 135 is not a list")
-
-        if isinstance(blogpost.tags, list):
-            print("tags on line 135 is a list")
-        else:
-            print("tags on line 135 is not a list")
 
     return BlogPostDTO.from_orm(blogpost)
 
 def generate_next_slug(blogpost: BlogPost) -> str:
     """Generates the next unique slug for the blogpost."""
-    return f"{os.getenv('WEEKLY_AI_SLUG')}-{blogpost.id}"
+    return f"weekly-{blogpost.blogpost_subject.value.lower()}-news-{blogpost.id}"
 
 def get_blogpost_by_id(post_id):
     """Retrieve a blog post and its metadata using metadata_id."""
@@ -147,22 +136,8 @@ def get_blogpost_by_id(post_id):
         blogpost = session.query(BlogPost).options(joinedload(BlogPost.blogpost_metadata)).filter(BlogPost.id == post_id).first()
         
         if blogpost:
-        #     blogpost.newsletter_sources = json.loads(blogpost.newsletter_sources)  # Convert JSON string back to list
-        #     blogpost.tags = json.loads(blogpost.tags)  # Convert JSON string back to list
-            # blogpost.created_at = blogpost.created_at.isoformat() if blogpost.created_at else None
-            # blogpost.published_at = blogpost.published_at.isoformat() if blogpost.published_at else None
-            #print out every value of blogpostDTO except for content
             # Optionally force loading:
             _ = blogpost.blogpost_metadata
-        if isinstance(blogpost.newsletter_sources, list):
-            print("newsletter_sources on line 156 is a list")
-        else:
-            print("newsletter_sources on line 156 is not a list")
-
-        if isinstance(blogpost.tags, list):
-            print("tags on line 156 is a list")
-        else:
-            print("tags on line 156 is not a list")
             
     return BlogPostDTO.from_orm(blogpost)
 
@@ -174,16 +149,6 @@ def update_blogpost_status(post_id, new_status):
             blogpost.status = new_status
             session.commit()
             session.refresh(blogpost)
-            #Check if newsletter_sources and tags are of type list
-        if isinstance(blogpost.newsletter_sources, list):
-            print("newsletter_sources on line 165 is a list")
-        else:
-            print("newsletter_sources on line 165 is not a list")
-
-        if isinstance(blogpost.tags, list):
-            print("tags on line 165 is a list")
-        else:
-            print("tags on line 165 is not a list")
 
 
     return BlogPostDTO.from_orm(blogpost)
@@ -217,9 +182,6 @@ def update_blogpost(post_id, blogpost):
         for key, value in vars(blogpost).items():
             if key == 'blogpost_metadata':
                 continue
-            #     continue  # Skip updating the relationship field
-            # Debug: print each key and value
-            #print(f"Updating field '{key}' to value: {value}")
             if key == 'newsletter_sources' and isinstance(value, list):
                 value = json.dumps(value)  # Convert list to JSON string
             if key == 'tags' and isinstance(value, list):
@@ -275,5 +237,11 @@ def update_blogpost_metadata(metadata_id, metadata):
     return BlogPostMetadataDTO.from_orm(existing_metadata)
     
 def convert_date(date_str):
-    return datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S +0000")
+    # Extract the main date-time part (before optional "(UTC)" or other extras)
+    match = re.match(r"^(.*?\+\d{4})", date_str)
+    if match:
+        clean_date_str = match.group(1)
+        return datetime.strptime(clean_date_str, "%a, %d %b %Y %H:%M:%S +0000")
+    
+    raise ValueError(f"Invalid date format: {date_str}")
 

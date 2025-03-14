@@ -46,8 +46,6 @@ def commit_and_push_to_github(BlogpostDTO):
     OWNER_EMAIL = os.getenv("OWNER_EMAIL")
     REPO = os.getenv("REPO_NAME")
 
-    print(f"Blog repository path: {blog_repo_path}")
-
     run_git_command(['git', 'config', '--global', 'user.name', OWNER], blog_repo_path)
     run_git_command(['git', 'config', '--global', 'user.email', OWNER_EMAIL], blog_repo_path)
 

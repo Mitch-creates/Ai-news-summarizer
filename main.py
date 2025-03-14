@@ -7,8 +7,9 @@ from database import db_operations
 from email_processing.gmail_interactions import fetch_emails
 from database.db_operations import initialize_database, insert_email, get_all_emails, check_if_email_exists_by_gmail_id
 from entities.Email import Email
+from enums.blogpost_subject import BlogPostSubject
 from enums.newsletters import Newsletters
-from blog.blogpost_creator import create_blogpost, generate_markdown_file
+from blog.blogpost_creator import create_blogpost, generate_markdown_file, get_prompt
 from git_processing.git_operations import commit_and_push_to_github, merge_pull_request
 
 load_dotenv("config/environment_variables.env")
@@ -18,12 +19,12 @@ def main():
     creds = authenticate_gmail()
     service = build("gmail", "v1", credentials=creds)
     
+    # get Ai BlogPostSubject
+    blogpost_subject = BlogPostSubject['AI']
+    # Step 2: Fetch newsletter emails where subject is AI
+    active_AI_newsletters = [newsletter.email for newsletter in Newsletters if newsletter.active == True and newsletter.subject == blogpost_subject]
 
-    # Step 2: Fetch newsletter emails
-    active_newsletters = [newsletter.value for newsletter in Newsletters.__members__.values() if newsletter.active]
-
-    all_bodies = []  # List of all email bodies
-    emails = fetch_emails(service, active_newsletters)
+    emails = fetch_emails(service, active_AI_newsletters)
 
     
 
@@ -52,12 +53,11 @@ def main():
             else:
                 print(f"Email from {sender} with subject '{subject}' already exists in the database.")
     
-   
-    newly_created_blogpost = create_blogpost(emails)
+    
+
+    newly_created_blogpost = create_blogpost(emails, blogpost_subject)
     blogpostdto = generate_markdown_file(newly_created_blogpost)
     updated_blogpost = db_operations.update_blogpost(blogpostdto.id, blogpostdto)
-
-    # # print(blogpostdto)
 
     pr_number = commit_and_push_to_github(updated_blogpost)
     merge_pull_request(pr_number)
