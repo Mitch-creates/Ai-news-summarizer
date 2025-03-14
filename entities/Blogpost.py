@@ -24,6 +24,7 @@ class BlogPost(Base):
     word_count = Column(Integer, nullable=False)
     openai_model = Column(String, nullable=False)
     tokens_used = Column(Integer, nullable=False)
+    published_weekday = Column(String, nullable=False)  # Store the weekday name as a string
     markdown_file_path = Column(String)
     status = Column(SqlAlchemyEnum(BlogPostStatus, name="blogpost_status"), nullable=False)  # ForeignKey to your Enum table (assuming it's stored in DB)
     tags = Column(String)  # Storing list as an array (use PostgreSQL)

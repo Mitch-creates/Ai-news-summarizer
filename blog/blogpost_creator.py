@@ -1,12 +1,10 @@
-import time
 import json
-import subprocess
+from jinja2 import Template
 import openai
 import os
 from dotenv import load_dotenv
 import yaml
 from bs4 import BeautifulSoup
-import requests
 from datetime import datetime
 
 from entities.Blogpost import BlogPost
@@ -52,7 +50,18 @@ def load_prompts():
 def get_prompt(subject: BlogPostSubject) -> str:
     """Loads the prompt based on the subject."""
     prompts = load_prompts()
-    return prompts.get(subject.name, "No prompt")
+    weekday = datetime.today().strftime('%A')
+
+    if subject.name not in prompts:
+        raise ValueError(f"No prompt found for {subject.name}")
+
+    prompt_template = prompts[subject.name]
+
+    if isinstance(prompt_template, str):
+        template = Template(prompt_template)
+        return template.render(day=weekday)
+    else:
+        raise ValueError(f"Invalid prompt format for {subject.name}")
 
 def insert_emaillist_in_prompt(emails: list, prompt: str) -> str:
     """Inserts the emails into the prompt."""
@@ -65,8 +74,6 @@ def insert_emaillist_in_prompt(emails: list, prompt: str) -> str:
 def create_blogpost(emails: list, blogpost_subject: BlogPostSubject) -> BlogPostDTO:
     """Summarizes the email body using OpenAI's GPT-3.5 model."""
     prompt = get_prompt(blogpost_subject)
-    if prompt == 'No prompt':
-        raise ValueError("Prompt is empty. Please check the prompt file.")
     # Check if the emails list is empty
     if not emails:
         raise ValueError("No emails available for processing.")
@@ -157,19 +164,24 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         word_count=len(remove_html_elements(parsed_data["content"])), 
         openai_model=model,
         tokens_used=amount_of_tokens, 
+        published_weekday=datetime.now().strftime('%A'),
         markdown_file_path=None,
         status=BlogPostStatus.DRAFT,
-        tags=json.dumps(parsed_data.get("tags", [])),  # Assuming tags are optional
+        tags=json.dumps(parsed_data.get("tags", [])),  
         prompt_used=prompt,
-        blogpost_subject=blogpost_subject,  # Assuming AI is the subject for now
+        blogpost_subject=blogpost_subject, 
         blogpost_metadata=metadata
     )
 
     return blogpost
 
 def create_title(blogpost_subject: BlogPostSubject) -> str:
-    print(f"Here? 2")
-    return f"Weekly {blogpost_subject.value.capitalize()} News - Week {datetime.now().isocalendar()[1]}"
+    """Creates a title for the blog post based on the subject and day of week."""
+    day_of_week = datetime.today().strftime('%A')
+    if (day_of_week == "Sunday"):
+        return f"{blogpost_subject.value.capitalize()} Weekly Recap - {day_of_week} edition"
+    elif (day_of_week == "Wednesday"):
+        return f"{blogpost_subject.value.capitalize()} Midweek Update - {day_of_week} edition"
 
 
 def remove_html_elements(html_content: str) -> str:

@@ -97,3 +97,6 @@ rm C:\Users\michi\Projects\blogtest\content\post\weekly-ai-news-1.md
 git add C:\Users\michi\Projects\blogtest\content\post\weekly-ai-news-1.md
 git commit -m "Remove test blog post file"
 git push origin develop
+
+## Automatically update the requirements.txt file with the following command
+pipreqs . --force

@@ -1,7 +1,6 @@
 import os
 import pickle
 import logging
-import webbrowser
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 

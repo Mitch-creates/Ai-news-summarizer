@@ -35,7 +35,11 @@ AI: |
     <h2>[Subheading]</h2>
     
     <p>[Introduction]</p>
-    <p>AI keeps evolving at a pace that makes even tech enthusiasts do a double-take. This week’s updates? Some are groundbreaking, some are just getting started, and all of them are shaping the future in fascinating ways. Let’s explore what’s new!</p>
+    {% if day == 'Sunday' %}
+    <p>[AI keeps evolving at a pace that makes even tech enthusiasts do a double-take. This week’s updates? Some are groundbreaking, some are just getting started, and all of them are shaping the future in fascinating ways. Let’s explore what’s new!]</p>
+    {% elif day == 'Wednesday' %}
+    <p>[This <strong>midweek AI update</strong> captures the freshest developments from the last three days, keeping you ahead of the curve.]</p>
+    {% endif %}
     
     <h2>[Subheading]</h2>
     <p>[Paragraph about AI news, adding engaging and relatable comments like 'A new AI model just dropped, and it might actually change how we interact with technology. Exciting times ahead!']</p>
@@ -82,8 +86,12 @@ TECH: |
   content: |
     <h2>[Subheading]</h2>
     <p>[Introduction]</p>
-    <p>Technology keeps evolving at breakneck speed, and this week's updates promise exciting shifts in how we live and work. Let's dive in and explore the innovations reshaping our world!</p>
-  
+    {% if day == 'Sunday' %}
+    <p>[Technology keeps evolving at breakneck speed, and this week's updates promise exciting shifts in how we live and work. Let's dive in and explore the innovations reshaping our world!]</p>
+    {% elif day == 'Wednesday' %}
+    <p>[This <strong>midweek Tech update</strong> captures the freshest developments from the last three days, keeping you ahead of the curve.]</p>
+    {% endif %}
+
     <h2>[Subheading]</h2>
     <p>[Tech news piece, engagingly written with examples like "The new smartphone might make your old one seem like ancient history."]</p>
   
@@ -125,8 +133,12 @@ SCIENCE: |
   content: |
     <h2>[Subheading]</h2>
     <p>[Introduction]</p>
-    <p>This week's scientific breakthroughs offer a glimpse into the extraordinary ways science shapes our understanding and future. Let's explore!</p>
-
+    {% if day == 'Sunday' %}
+    <p>[This week's scientific breakthroughs offer a glimpse into the extraordinary ways science shapes our understanding and future. Let's explore!]</p>
+    {% elif day == 'Wednesday' %}
+    <p>[This <strong>midweek Science update</strong> captures the freshest developments from the last three days, keeping you ahead of the curve.]</p>
+    {% endif %}
+    
     <h2>[Subheading]</h2>
     <p>[Science news, engagingly written with relatable analogies and examples.]</p>
 

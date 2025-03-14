@@ -1,12 +1,14 @@
+from datetime import datetime
 import os
 import sys
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from auth.gmail_auth import authenticate_gmail  # Import your authentication function
 from database import db_operations
-from email_processing.gmail_interactions import fetch_emails, fetch_sunday_emails
+from email_processing.gmail_interactions import fetch_emails, fetch_sunday_emails, fetch_wednesday_emails
 from database.db_operations import initialize_database, insert_email, get_all_emails, check_if_email_exists_by_gmail_id
 from entities.Email import Email
+from enums import newsletters
 from enums.blogpost_subject import BlogPostSubject
 from enums.newsletters import Newsletters
 from blog.blogpost_creator import create_blogpost, generate_markdown_file, get_prompt
@@ -18,14 +20,24 @@ def main():
     # Step 1: Authenticate with Gmail
     creds = authenticate_gmail()
     service = build("gmail", "v1", credentials=creds)
+
     
     # get Ai BlogPostSubject
     blogpost_subject = BlogPostSubject['AI']
     # Step 2: Fetch newsletter emails where subject is AI
-    active_AI_newsletters = [newsletter.email for newsletter in Newsletters if newsletter.active == True and newsletter.subject == blogpost_subject]
+    active_ai_newsletters = [newsletter.email for newsletter in Newsletters if newsletter.active == True and newsletter.subject == blogpost_subject]
 
-    emails = fetch_sunday_emails(service, active_AI_newsletters)
+    today = datetime.today().strftime('%A')  # Get current weekday name
 
+    if today == "Sunday":
+        print("Running Sunday email fetch...")
+        emails = fetch_sunday_emails(service, active_ai_newsletters)
+    elif today == "Wednesday":
+        print("Running Wednesday email fetch...")
+        emails = fetch_wednesday_emails(service, active_ai_newsletters)
+    else:
+        print("Script executed on an unintended day. Exiting.")
+        return
     
 
     

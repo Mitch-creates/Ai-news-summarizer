@@ -1,6 +1,5 @@
 import os
 import base64
-import email
 from email.utils import parseaddr
 import re
 from googleapiclient.discovery import build

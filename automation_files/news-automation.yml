@@ -1,0 +1,39 @@
+name: AI News Automation
+
+on:
+  schedule:
+    - cron: '0 17 * * 0'  # Sunday at 5 PM UTC
+    - cron: '0 8 * * 3'   # Wednesday at 8 AM UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  generate-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13.2'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Determine Execution Day
+        id: set_day
+        run: echo "DAY=$(date +%A)" >> $GITHUB_ENV
+
+      - name: Run Newsletter Fetch & Blog Generation
+        run: python main.py --day $DAY
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "Automated News Summary for $DAY" || echo "No changes to commit"
+          git push

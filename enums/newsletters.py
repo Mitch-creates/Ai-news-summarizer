@@ -8,6 +8,7 @@ class Newsletters(PyEnum):
     BENSBITES = ("bensbites@mail.bensbites.co", False, BlogPostSubject.AI)
     THERUNDOWN = ("news@daily.therundown.ai", False, BlogPostSubject.AI)
     TLDR = ("dan@tldrnewsletter.com", True, BlogPostSubject.AI)
+    TECHCRUNCH = ('newsletters@techcrunch.com', True, BlogPostSubject.TECH)
 
     def __init__(self, email, active, subject: BlogPostSubject):
         self._email = email

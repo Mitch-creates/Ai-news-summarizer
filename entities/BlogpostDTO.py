@@ -51,6 +51,7 @@ class BlogPostDTO:
     word_count: int
     openai_model: str
     tokens_used: int
+    published_weekday: str 
     markdown_file_path: Optional[str]
     status: str
     blogpost_subject: str
@@ -71,6 +72,7 @@ class BlogPostDTO:
             word_count=blogpost.word_count,
             openai_model=blogpost.openai_model,
             tokens_used=blogpost.tokens_used,
+            published_weekday=blogpost.published_weekday, 
             markdown_file_path=blogpost.markdown_file_path,
             status=blogpost.status.value,  # Assuming BlogPostStatus is an Enum
             tags=json.loads(blogpost.tags) if blogpost.tags else [],
@@ -91,11 +93,12 @@ class BlogPostDTO:
             word_count=self.word_count,
             openai_model=self.openai_model,
             tokens_used=self.tokens_used,
+            published_weekday=self.published_weekday, 
             markdown_file_path=self.markdown_file_path,
-            status=BlogPostStatus[self.status],  # If this is an enum, you'll need to convert appropriately
+            status=BlogPostStatus[self.status], 
             tags=json.dumps(self.tags),
             prompt_used=self.prompt_used,
-            blogpost_subject=BlogPostSubject[self.blogpost_subject],  # If this is an enum, you'll need to convert appropriately
+            blogpost_subject=BlogPostSubject[self.blogpost_subject],  
         )
         if self.blogpost_metadata:
             blogpost.blogpost_metadata = self.blogpost_metadata.to_orm()
