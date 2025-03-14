@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from auth.gmail_auth import authenticate_gmail  # Import your authentication function
 from database import db_operations
-from email_processing.gmail_interactions import fetch_emails
+from email_processing.gmail_interactions import fetch_emails, fetch_sunday_emails
 from database.db_operations import initialize_database, insert_email, get_all_emails, check_if_email_exists_by_gmail_id
 from entities.Email import Email
 from enums.blogpost_subject import BlogPostSubject
@@ -24,7 +24,7 @@ def main():
     # Step 2: Fetch newsletter emails where subject is AI
     active_AI_newsletters = [newsletter.email for newsletter in Newsletters if newsletter.active == True and newsletter.subject == blogpost_subject]
 
-    emails = fetch_emails(service, active_AI_newsletters)
+    emails = fetch_sunday_emails(service, active_AI_newsletters)
 
     
 

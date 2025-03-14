@@ -14,19 +14,31 @@ load_dotenv(dotenv_path="config/environment_variables.env")
 
 GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 
-def fetch_emails(service, newsletters):
-    """Fetches AI newsletter emails from the last 7 days and summarizes them."""
-    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:7d'  # Fetch last 7 days
-    print(f"Constructed Query: {query}")  # Debugging statement
-    results = service.users().messages().list(userId="me", q=query).execute()
-    # Fetch the list of messages
-    messages = results.get("messages", [])
-    print(f"Number of messages found: {len(messages)}")  # Debugging statement
+def fetch_sunday_emails(service, newsletters):
+    """Fetches AI newsletter emails from Wednesday to Sunday (4-day window)."""
+    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:4d'  # Fetch last 4 days
+    print(f"Constructed Query (Sunday Fetch): {query}")  # Debugging statement
+    return fetch_emails(service, query)
 
-    if not messages:
-        print("No new AI newsletters found.")
-        return []
+
+def fetch_wednesday_emails(service, newsletters):
+    """Fetches AI newsletter emails from Sunday to Wednesday (3-day window)."""
+    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:3d'  # Fetch last 3 days
+    print(f"Constructed Query (Wednesday Fetch): {query}")  # Debugging statement
+    return fetch_emails(service, query)
+
+
+def fetch_emails(service, query):
+    """Fetches newsletter emails based on a given Gmail query."""
+    results = service.users().messages().list(userId="me", q=query).execute()
+    messages = results.get("messages", [])
     
+    print(f"Number of messages found: {len(messages)}")  # Debugging statement
+    
+    if not messages:
+        print("No new newsletters found.")
+        return []
+
     emails = []
     for message in messages:
         emails.append(create_email_object(*get_email_content(service, "me", message["id"])))
