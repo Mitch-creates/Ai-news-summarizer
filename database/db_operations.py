@@ -95,7 +95,7 @@ def check_if_email_exists_by_gmail_id(gmail_id):
         exists = session.query(Email).filter(Email.gmail_id == gmail_id).first() is not None
     return exists
 
-def insert_blogpost(blogpost):
+def insert_blogpost(blogpost, slug):
     """Insert a new blog post into the database and return the created blog post."""
 
     if isinstance(blogpost.published_at, str):
@@ -120,15 +120,11 @@ def insert_blogpost(blogpost):
             session.refresh(blogpost.blogpost_metadata)
 
         if blogpost.blogpost_metadata and not blogpost.blogpost_metadata.slug:
-            blogpost.blogpost_metadata.slug = generate_next_slug(blogpost)
+            blogpost.blogpost_metadata.slug = slug
             session.commit()
             session.refresh(blogpost.blogpost_metadata)
 
     return BlogPostDTO.from_orm(blogpost)
-
-def generate_next_slug(blogpost: BlogPost) -> str:
-    """Generates the next unique slug for the blogpost."""
-    return f"weekly-{blogpost.blogpost_subject.value.lower()}-news-{blogpost.id}"
 
 def get_blogpost_by_id(post_id):
     """Retrieve a blog post and its metadata using metadata_id."""

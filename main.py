@@ -1,81 +1,164 @@
+import argparse
 from datetime import datetime
-import os
+import email
 import sys
+import time
 from dotenv import load_dotenv
+import logging
 from googleapiclient.discovery import build
-from auth.gmail_auth import authenticate_gmail  # Import your authentication function
+from googleapiclient.errors import HttpError
+from auth.gmail_auth import authenticate_gmail 
 from database import db_operations
-from email_processing.gmail_interactions import fetch_emails, fetch_sunday_emails, fetch_wednesday_emails
-from database.db_operations import initialize_database, insert_email, get_all_emails, check_if_email_exists_by_gmail_id
+from email_processing.gmail_interactions import fetch_sunday_emails, fetch_wednesday_emails
+from database.db_operations import initialize_database, insert_email, check_if_email_exists_by_gmail_id
 from entities.Email import Email
-from enums import newsletters
 from enums.blogpost_subject import BlogPostSubject
 from enums.newsletters import Newsletters
-from blog.blogpost_creator import create_blogpost, generate_markdown_file, get_prompt
-from git_processing.git_operations import commit_and_push_to_github, merge_pull_request
+from blog.blogpost_creator import create_blogpost, generate_markdown_file
+from git_processing.git_operations import commit_and_push_all, merge_pull_request
 
-load_dotenv("config/environment_variables.env")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
-def main():
-    # Step 1: Authenticate with Gmail
-    creds = authenticate_gmail()
-    service = build("gmail", "v1", credentials=creds)
+logging.getLogger().handlers[0].flush = sys.stdout.flush
+logging.getLogger().setLevel(logging.INFO)
 
+# Supported subjects
+SUBJECTS = ["AI", "TECH", "SCIENCE"]
+blogposts_to_commit = []  # List to track blog posts that need committing
+
+def get_active_newsletters(subject):
+    """Fetch active newsletters for a given subject."""
+    return [newsletter.email for newsletter in Newsletters if newsletter.active and newsletter.subject == subject]
+
+def fetch_emails_for_today(service, active_newsletters, today):
+    """Determine the day and fetch emails accordingly."""
+
+    try:
+        if today == "Sunday":
+            logging.info("Running Sunday email fetch...")
+            return fetch_sunday_emails(service, active_newsletters)
+        elif today == "Wednesday":
+            logging.info("Running Wednesday email fetch...")
+            return fetch_wednesday_emails(service, active_newsletters)
+        else:
+            logging.warning("Script executed on an unintended day. Skipping email fetch.")
+            return []
+    except HttpError as e:
+        logging.error(f"Gmail API error while fetching emails: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error while fetching emails: {e}")
+        return []
     
-    # get Ai BlogPostSubject
-    blogpost_subject = BlogPostSubject['AI']
-    # Step 2: Fetch newsletter emails where subject is AI
-    active_ai_newsletters = [newsletter.email for newsletter in Newsletters if newsletter.active == True and newsletter.subject == blogpost_subject]
+def parse_email_date(date_string):
+    """Parses an email date string into a Python datetime object."""
+    try:
+        parsed_date = email.utils.parsedate_to_datetime(date_string)
+        return parsed_date
+    except Exception as e:
+        logging.error(f"Invalid date format: {date_string} - Error: {e}")
+        return None  # Return None so we can handle it gracefully
 
-    today = datetime.today().strftime('%A')  # Get current weekday name
-
-    if today == "Sunday":
-        print("Running Sunday email fetch...")
-        emails = fetch_sunday_emails(service, active_ai_newsletters)
-    elif today == "Wednesday":
-        print("Running Wednesday email fetch...")
-        emails = fetch_wednesday_emails(service, active_ai_newsletters)
-    else:
-        print("Script executed on an unintended day. Exiting.")
+def process_emails(emails):
+    """Process and store emails in the database."""
+    if not emails:
+        logging.info("No new emails fetched. Skipping processing.")
         return
     
-
-    
     for email in emails:
-            sender = email.sender_name  # Extract sender name
-            subject = email.subject  # Extract email subject
-            body = email.body  # Extract full email body
-            date = email.date  # Extract email date
-            sender_email = email.sender_email  # Extract sender email
-            email_gmail_id = email.gmail_id # Extract unique email ID
-    
-            # Check if the email already exists in the database
-            if not check_if_email_exists_by_gmail_id(email_gmail_id):
+        try:
+            if not check_if_email_exists_by_gmail_id(email.gmail_id):
                 email_object = Email(
-                sender_name=sender,
-                date=date,
-                subject=subject,
-                body=body,
-                sender_email=sender_email,
-                gmail_id=email_gmail_id,
-                published=False
+                    sender_name=email.sender_name,
+                    date=parse_email_date(email.date),
+                    subject=email.subject,
+                    body=email.body,
+                    sender_email=email.sender_email,
+                    gmail_id=email.gmail_id,
+                    published=False
                 )
                 insert_email(email_object)
-                print(f"Inserted email from {sender} with subject '{subject}' into the database.")
+                logging.info(f"Inserted email from {email.sender_name} with subject '{email.subject}' into the database.")
             else:
-                print(f"Email from {sender} with subject '{subject}' already exists in the database.")
+                logging.info(f"Email from {email.sender_name} with subject '{email.subject}' already exists in the database.")
+        except Exception as e:
+            logging.error(f"Error processing email {email.gmail_id}: {e}")
+
+def generate_blogpost(emails, subject, today):
+    """Generate a blog post from emails and publish it."""
+    if not emails:
+        logging.info(f"No emails found for {subject}. Skipping blog post generation.")
+        return
     
-    
+    try:
+        blogpost = create_blogpost(emails, subject, today)
+        blogpost_dto = generate_markdown_file(blogpost)
+        updated_blogpost = db_operations.update_blogpost(blogpost_dto.id, blogpost_dto)
 
-    newly_created_blogpost = create_blogpost(emails, blogpost_subject)
-    blogpostdto = generate_markdown_file(newly_created_blogpost)
-    updated_blogpost = db_operations.update_blogpost(blogpostdto.id, blogpostdto)
+        logging.info(f"Generated blog post for {subject}.")
+        return updated_blogpost  # Add to list for later Git committing
 
-    pr_number = commit_and_push_to_github(updated_blogpost)
-    merge_pull_request(pr_number)
+    except Exception as e:
+        logging.error(f"Error during blog post generation/publishing for {subject}: {e}")
+        return None
 
+def main():
+    """Main entry point for the script."""
+    parser = argparse.ArgumentParser(description="Run the AI News Summary script.")
+    parser.add_argument("--day", type=str, choices=["Sunday", "Wednesday"], help="Manually specify the day for testing.")
+    args = parser.parse_args()
+
+    # Use the argument if provided, otherwise use today's actual day
+    today = args.day if args.day else datetime.today().strftime('%A')
+    try:
+        # Step 1: Authenticate with Gmail API
+        creds = authenticate_gmail()
+        service = build("gmail", "v1", credentials=creds)
+
+        # Step 2: Fetch active newsletters and generate blog posts for multiple subjects
+        for subject in SUBJECTS:
+            emails = []  # Reset emails for each subject
+            logging.info(f"Processing {subject} newsletters...")
+            subject = BlogPostSubject[subject]
+            active_newsletters = get_active_newsletters(subject)
+
+            if not active_newsletters:
+                logging.info(f"No active newsletters added for {subject}. Skipping to next subject.")
+                continue  
+
+            emails = fetch_emails_for_today(service, active_newsletters, today)
+
+            if not emails:
+                logging.info(f"No emails found for {subject}. Skipping to next subject.")
+                continue
+
+            process_emails(emails)
+            blogpost = generate_blogpost(emails, subject, today)
+            if blogpost:
+                blogposts_to_commit.append(blogpost)
+
+            logging.info(f"Completed processing blogpost for {subject} newsletters.")
+            time.sleep(5)  # Sleep to avoid hitting API limits
+        
+        if blogposts_to_commit:
+            logging.info("Committing and pushing all generated blog posts in a single push...")
+            pr_number = commit_and_push_all(blogposts_to_commit)
+            merge_pull_request(pr_number)
+        else:
+            logging.info("No blog posts generated. Skipping GitHub commit.")
+
+        logging.info("All blog post generation completed successfully.")
+
+    except HttpError as e:
+        logging.error(f"Gmail API error: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error in main execution: {e}")
 
 if __name__ == "__main__":
-    initialize_database()
+    db_operations.initialize_database()
     main()
-    print("Done")

@@ -1,4 +1,6 @@
 import json
+import logging
+import sys
 from jinja2 import Template
 import openai
 import os
@@ -13,6 +15,13 @@ from entities.Blogpost_metadata import BlogPostMetadata
 from enums.blogpost_status import BlogPostStatus
 import database.db_operations
 from enums.blogpost_subject import BlogPostSubject
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 # Load environment variables
 load_dotenv("config/environment_variables.env")
@@ -47,15 +56,17 @@ def load_prompts():
     with open("yaml_data/prompts.yaml", "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
 
-def get_prompt(subject: BlogPostSubject) -> str:
+def get_prompt(subject: BlogPostSubject, today) -> str:
     """Loads the prompt based on the subject."""
     prompts = load_prompts()
-    weekday = datetime.today().strftime('%A')
+    weekday = today
 
     if subject.name not in prompts:
         raise ValueError(f"No prompt found for {subject.name}")
 
     prompt_template = prompts[subject.name]
+
+    print(f"Prompt template for {subject.name}: {prompt_template}")  # Debugging statement
 
     if isinstance(prompt_template, str):
         template = Template(prompt_template)
@@ -71,16 +82,19 @@ def insert_emaillist_in_prompt(emails: list, prompt: str) -> str:
         raise ValueError("Prompt is empty after inserting emaillist. Please check the prompt file.")
     return final_prompt
     
-def create_blogpost(emails: list, blogpost_subject: BlogPostSubject) -> BlogPostDTO:
+def create_blogpost(emails: list, blogpost_subject: BlogPostSubject, today) -> BlogPostDTO:
     """Summarizes the email body using OpenAI's GPT-3.5 model."""
-    prompt = get_prompt(blogpost_subject)
+    prompt = get_prompt(blogpost_subject, today)
     # Check if the emails list is empty
     if not emails:
         raise ValueError("No emails available for processing.")
     
     
     final_prompt = insert_emaillist_in_prompt(emails, prompt)
+    # print short version of final_prompt for debugging
     # Check if the prompt is empty or None
+
+    print(f"Preparing request for {blogpost_subject.value.capitalize()} blog post...")
     
     try:
         response = client.chat.completions.create(
@@ -95,10 +109,11 @@ def create_blogpost(emails: list, blogpost_subject: BlogPostSubject) -> BlogPost
         
         response_with_backticks = response_with_backticks.strip()
         cleaned_response = response_with_backticks.strip('```yaml').strip('```')
-        blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, list(set(email.sender_name for email in emails)), blogpost_subject)
+
+        blogpost = create_blogpost_instance_from_yaml(cleaned_response, prompt, len(emails), response.usage.total_tokens, list(set(email.sender_name for email in emails)), blogpost_subject, today)
         
         
-        newly_created_blogpost = database.db_operations.insert_blogpost(blogpost)
+        newly_created_blogpost = database.db_operations.insert_blogpost(blogpost, generate_next_slug(today, blogpost))
         
         return newly_created_blogpost
     except GeneratorExit:
@@ -106,6 +121,50 @@ def create_blogpost(emails: list, blogpost_subject: BlogPostSubject) -> BlogPost
     except Exception as e:
         print(f"Error in generating blogpost: {e}")
         return "Failed to generate blogpost"
+    
+# Ensure the "json_data" directory exists
+DATA_DIR = os.path.join(os.getcwd(), "json_data")  # Gets the full path
+os.makedirs(DATA_DIR, exist_ok=True)  # Creates the directory if it doesn't exist
+
+# Path to the JSON file
+COUNTER_FILE = os.path.join(DATA_DIR, "slug_counters.json")
+
+def load_counters():
+    """Loads the counters from a JSON file or initializes an empty dictionary."""
+    if os.path.exists(COUNTER_FILE):
+        try:
+            with open(COUNTER_FILE, "r") as f:
+                return json.load(f)  # Try to load the JSON content
+        except json.JSONDecodeError:  # Handle corrupted JSON
+            print("Warning: JSON file was corrupted. Resetting it.")
+            return {}  # Return an empty dict to reset it
+    return {}  # If file doesn't exist, return an empty dict
+
+
+def save_counters(counters):
+    """Saves the counters to a JSON file safely."""
+    temp_file = COUNTER_FILE + ".tmp"  # Use a temp file to prevent corruption
+    with open(temp_file, "w") as f:
+        json.dump(counters, f, indent=4)
+    
+    os.replace(temp_file, COUNTER_FILE)  # Replace the old file atomically
+
+
+def generate_next_slug(today, blogpost : BlogPost) -> str:
+    """Generates a unique slug based on a JSON-stored counter, starting at 1 if the subject is new."""
+    assert today in ["Sunday", "Wednesday"], f"Invalid day: {today}"
+    counters = load_counters()
+
+    counter_key = f"{blogpost.blogpost_subject.name}-{today}"
+    # If the subject is new, initialize it at 1
+    counters[counter_key] = counters.get(counter_key, 0) + 1
+
+    # Save updated counters
+    save_counters(counters)
+
+    slug_type = "weekly" if today == "Sunday" else "midweek"
+
+    return f"{slug_type}-{blogpost.blogpost_subject.value.lower()}-news-{counters[counter_key]}"
 
 def format_email_body_for_openai(emails: list) -> str:
     """Takes the needed data and structures it for OpenAI processing."""
@@ -129,15 +188,44 @@ def format_email_body_for_openai(emails: list) -> str:
     return "\n".join(structured_bodies)
 
 def parse_yaml_response(response: str):
-    """Parses YAML response into a Python dictionary."""
+    """Parses an OpenAI YAML response and ensures it's valid."""
     try:
-        parsed_data = yaml.safe_load(response)
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML response: {e}")
-    return parsed_data
+        logging.info("Parsing YAML response...")
 
-def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_emails: int, amount_of_tokens: int, newsletter_sources: list, blogpost_subject: BlogPostSubject) -> BlogPost:
+        # Ensure the response is not empty
+        if not response or not response.strip():
+            logging.error("Received an empty YAML response!")
+            return None
+
+        # Fix triple backtick markdown issue
+        if "```" in response:
+            logging.warning("Detected triple backticks in YAML. Removing them...")
+            response = response.replace("```", "")
+
+        parsed_data = yaml.safe_load(response)
+
+        if not isinstance(parsed_data, dict):
+            logging.error(f"Parsed YAML is not a dictionary: {parsed_data}")
+            return None
+
+        logging.info("Successfully parsed YAML.")
+        return parsed_data
+
+    except yaml.YAMLError as e:
+        logging.error(f"Error parsing YAML response: {e}")
+        return None
+
+def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_emails: int, amount_of_tokens: int, newsletter_sources: list, blogpost_subject: BlogPostSubject, today) -> BlogPost:
     """Creates a BlogPost instance from the parsed YAML response."""
+    print("Michiel")
+
+    print("🔍 Debugging `create_blogpost_instance_from_yaml()` Inputs:")
+    print(f"Response: {response[:500]}")  # Log first 500 characters to prevent excessive output
+    print(f"Prompt Used: {prompt[:500]}")
+    print(f"Amount of Emails: {amount_of_emails}")
+    print(f"Amount of Tokens: {amount_of_tokens}")
+    print(f"Newsletter Sources: {newsletter_sources}")
+    print(f"Blogpost Subject: {blogpost_subject}")
     parsed_data = parse_yaml_response(response)
 
     # Validate required fields
@@ -146,8 +234,13 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         if field not in parsed_data:
             raise ValueError(f"Missing required field in response: {field}")
     
+    
+    
+    print("🔍 Parsed YAML Response:")
+    print(json.dumps(parsed_data, indent=2))  # Pretty-print parsed YAML
+    
     metadata = BlogPostMetadata(
-        title=create_title(blogpost_subject),
+        title=create_title(blogpost_subject, today),
         date=datetime.now(),
         description=parsed_data["description"],
         author="AI",
@@ -173,11 +266,17 @@ def create_blogpost_instance_from_yaml(response: str, prompt: str, amount_of_ema
         blogpost_metadata=metadata
     )
 
+    print("✅ Successfully Created BlogPost Instance:")
+    print(f"BlogPost Title: {metadata.title}")
+    print(f"BlogPost Description: {metadata.description}")
+    print(f"Word Count: {blogpost.word_count}")
+    print(f"Tags: {blogpost.tags}")
+
     return blogpost
 
-def create_title(blogpost_subject: BlogPostSubject) -> str:
+def create_title(blogpost_subject: BlogPostSubject, today) -> str:
     """Creates a title for the blog post based on the subject and day of week."""
-    day_of_week = datetime.today().strftime('%A')
+    day_of_week = today
     if (day_of_week == "Sunday"):
         return f"{blogpost_subject.value.capitalize()} Weekly Recap - {day_of_week} edition"
     elif (day_of_week == "Wednesday"):

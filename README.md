@@ -90,13 +90,5 @@ If you would like to contribute to this project, please fork the repository and 
 
 This project is licensed under the MIT License. See the `LICENSE` file for more details.
 
-
-## Rewinding the creaton of the markdownfile in the blog repository
-
-rm C:\Users\michi\Projects\blogtest\content\post\weekly-ai-news-1.md
-git add C:\Users\michi\Projects\blogtest\content\post\weekly-ai-news-1.md
-git commit -m "Remove test blog post file"
-git push origin develop
-
 ## Automatically update the requirements.txt file with the following command
 pipreqs . --force

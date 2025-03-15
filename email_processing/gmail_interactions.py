@@ -14,8 +14,8 @@ load_dotenv(dotenv_path="config/environment_variables.env")
 GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
 
 def fetch_sunday_emails(service, newsletters):
-    """Fetches AI newsletter emails from Wednesday to Sunday (4-day window)."""
-    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:4d'  # Fetch last 4 days
+    """Fetches AI newsletter emails from the past week on Sunday."""
+    query = ' OR '.join([f'from:{sender}' for sender in newsletters if isinstance(sender, str) and '@' in sender]) + ' newer_than:7d'  # Fetch last 7 days
     print(f"Constructed Query (Sunday Fetch): {query}")  # Debugging statement
     return fetch_emails(service, query)
 
