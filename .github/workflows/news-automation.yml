@@ -17,7 +17,7 @@ jobs:
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.13.2'
+          python-version: '3.x'
 
       - name: Install Dependencies
         run: |
@@ -28,7 +28,7 @@ jobs:
         run: echo "DAY=$(date +%A)" >> $GITHUB_ENV
 
       - name: Run Newsletter Fetch & Blog Generation
-        run: python main.py --day $DAY
+        run: python main.py --day ${{ env.DAY }}
 
       - name: Commit and Push Changes
         run: |

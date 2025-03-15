@@ -56,7 +56,7 @@ def setup_git():
         logging.error(f"Error setting up Git authentication: {e}")
 
 def fetch_latest_branch():
-    """Ensure the latest `develop` branch is checked out and updated."""
+    """Ensure the latest `develop` branch is checked out and updated safely."""
     try:
         blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
 
@@ -64,10 +64,18 @@ def fetch_latest_branch():
             logging.info("Uncommitted changes detected! Stashing changes before switching branches.")
             run_git_command(["git", "stash"], blog_repo_path)
 
+        # Add this step to handle untracked files before switching branches
+        untracked_files = run_git_command(["git", "ls-files", "--others", "--exclude-standard"], blog_repo_path)
+        if untracked_files:
+            logging.info("Untracked files detected. Adding them before switching branches.")
+            run_git_command(["git", "add", "."], blog_repo_path)
+            run_git_command(["git", "commit", "-m", "Adding untracked files before branch switch"], blog_repo_path)
+
+        # Now, safely switch to develop
         run_git_command(["git", "checkout", "develop"], blog_repo_path)
         run_git_command(["git", "pull", "origin", "develop"], blog_repo_path)
 
-        # Check if stash list has any saved changes
+        # Check if stash exists before popping
         stash_list = run_git_command(["git", "stash", "list"], blog_repo_path)
         if stash_list and "stash@{" in stash_list:
             logging.info("Restoring stashed changes...")
@@ -75,12 +83,14 @@ def fetch_latest_branch():
 
             if "conflict" in stash_result.lower():
                 logging.warning("Merge conflict detected in stash pop. Attempting auto-resolution...")
-                run_git_command(["git", "checkout", "--theirs", "."], blog_repo_path)  # Keep the latest changes
+                run_git_command(["git", "checkout", "--theirs", "."], blog_repo_path)  # Keep latest version
                 run_git_command(["git", "add", "."], blog_repo_path)  # Mark conflicts as resolved
+                run_git_command(["git", "commit", "-m", "Auto-resolved stash conflicts"], blog_repo_path)
 
         logging.info("Develop branch is up to date.")
     except Exception as e:
         logging.error(f"Error fetching latest branch: {e}")
+
 
 def commit_changes(blogposts):
     """Commit all blog posts together in a single commit."""
@@ -117,13 +127,26 @@ def commit_changes(blogposts):
         return False
     
 def push_changes():
-    """Push all committed changes to the develop branch."""
+    """Push all committed changes to the develop branch and ensure master is updated after merging."""
     try:
         blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
         run_git_command(["git", "push", "origin", "develop"], blog_repo_path)
         logging.info("Successfully pushed changes to remote repository.")
+
+        # Ensure master is updated after merge
+        run_git_command(["git", "checkout", "master"], blog_repo_path)
+        pull_result = run_git_command(["git", "pull", "origin", "master"], blog_repo_path)
+
+        if "conflict" in pull_result.lower():
+            logging.warning("Merge conflict detected in master pull. Attempting auto-resolution...")
+            run_git_command(["git", "checkout", "--theirs", "."], blog_repo_path)  # Keep latest version
+            run_git_command(["git", "add", "."], blog_repo_path)  # Mark conflicts as resolved
+            run_git_command(["git", "commit", "-m", "Auto-resolved merge conflicts in master"], blog_repo_path)
+
+        logging.info("Master branch is now up to date.")
     except Exception as e:
         logging.error(f"Error pushing changes to GitHub: {e}")
+
 
 def check_existing_pr():
     """Checks if there's already an open PR from `develop` to `master`."""
@@ -201,6 +224,8 @@ def commit_and_push_all(blogposts):
     
 import time
 
+import time
+
 def merge_pull_request(pr_number):
     """Merges an open PR (`develop` → `master`)."""
     if pr_number is None:
@@ -224,17 +249,29 @@ def merge_pull_request(pr_number):
         mergeable_state = pr_data.get("mergeable_state", "unknown")
         logging.info(f"Checking mergeability of PR #{pr_number}: {mergeable_state}")
 
-        if mergeable_state in ["clean", "unstable"]:  # "clean" = safe merge, "unstable" = may need rebase
+        if mergeable_state == "clean":
             break
         elif mergeable_state == "dirty":
-            logging.warning(f"PR #{pr_number} has conflicts and cannot be auto-merged.")
-            return
+            logging.warning(f"PR #{pr_number} has conflicts. Attempting auto-resolution...")
+            
+            # Checkout master and pull latest changes
+            run_git_command(["git", "checkout", "master"], blog_repo_path)
+            run_git_command(["git", "pull", "origin", "master"], blog_repo_path)
+
+            # Merge develop into master with conflict resolution
+            run_git_command(["git", "merge", "--strategy-option=theirs", "develop"], blog_repo_path)
+            run_git_command(["git", "add", "."], blog_repo_path)  # Stage resolved files
+            run_git_command(["git", "commit", "-m", "Auto-resolved merge conflicts"], blog_repo_path)
+            run_git_command(["git", "push", "origin", "master"], blog_repo_path)
+
+            logging.info(f"Successfully force-merged `develop` into `master`.")
+            return True
         else:
             logging.info("Waiting for GitHub to determine mergeability...")
             time.sleep(10)
             attempts += 1
 
-    # Merge the PR if possible
+    # If mergeable, merge via API
     merge_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{pr_number}/merge"
     merge_payload = {"commit_message": f"Auto-merging PR #{pr_number}"}
     merge_response = requests.put(merge_url, json=merge_payload, headers=headers)
@@ -242,7 +279,7 @@ def merge_pull_request(pr_number):
     if merge_response.status_code == 200:
         logging.info(f"Pull request #{pr_number} merged successfully!")
 
-        # Ensure `master` is up-to-date
+        # Ensure master is updated after merge
         run_git_command(["git", "checkout", "master"], blog_repo_path)
         run_git_command(["git", "pull", "origin", "master"], blog_repo_path)
 
@@ -251,6 +288,7 @@ def merge_pull_request(pr_number):
     else:
         logging.error(f"Failed to merge PR #{pr_number}: {merge_response.json()}")
         return False
+
 
 
 
