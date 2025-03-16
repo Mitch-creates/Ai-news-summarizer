@@ -4,7 +4,7 @@ import logging
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]  # Update with required scopes
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]  # Update with required scopes
 
 def authenticate_gmail():
     print("Starting Gmail authentication...")

@@ -40,6 +40,7 @@ def fetch_emails(service, query):
 
     emails = []
     for message in messages:
+        mark_email_as_read(service, "me", message["id"])
         emails.append(create_email_object(*get_email_content(service, "me", message["id"])))
 
     return emails
@@ -117,8 +118,17 @@ def mark_email_as_read(service, user_id, email_id):
     service.users().messages().modify(
         userId=user_id,
         id=email_id,
-        body={'removeLabelIds': [GmailLabels.UNREAD.value]}
+        body={'removeLabelIds': ['UNREAD']}
     ).execute()
+
+def mark_email_as_unread(service, user_id, email_id):
+    """Marks an email as unread by adding the UNREAD label."""
+    service.users().messages().modify(
+        userId=user_id,
+        id=email_id,
+        body={'addLabelIds': ['UNREAD']}
+    ).execute()
+
 
 def create_label(service, user_id, label_name):
     """Creates a new label in the user's mailbox."""
@@ -138,6 +148,29 @@ def apply_label_to_email(service, user_id, email_id, label_id):
         body={'addLabelIds': [label_id]}
     ).execute()
 
+def apply_label_to_multiple_emails(service, user_id, emails, label_id):
+    """Applies a label to multiple emails."""
+    email_ids = [email.gmail_id for email in emails]
+    for email_id in email_ids:
+        apply_label_to_email(service, user_id, email_id, label_id)
+
+def rollback_email_status(service, user_id, email):
+    """Resets labels if a blog post is not created successfully."""
+    email_id = email.gmail_id
+    reset_labels(service, user_id, email_id, ["Label_3076953365604997473", "Label_6126309069161477633"])
+    mark_email_as_unread(service, user_id, email_id)
+    print(f"Email {email_id} rolled back to READ status.")
+
+def rollback_multiple_emails_statuses(service, user_id, emails):
+    """Resets labels for multiple emails if blog posts are not created successfully."""
+    for email in emails:
+        reset_labels(service, user_id, email.gmail_id, ["Label_3076953365604997473", "Label_6126309069161477633"])
+        mark_email_as_unread(service, user_id, email.gmail_id)
+        print(f"Email {email.gmail_id} rolled back to READ status.")
+
+# PUBLISHED -> Label_3076953365604997473
+# PARSED -> Label_6126309069161477633
+
 def reset_labels(service, user_id, email_id, label_ids):
     """Removes all labels from an email."""
     service.users().messages().modify(
@@ -151,7 +184,7 @@ def reset_process(service, user_id):
     results = service.users().messages().list(userId=user_id, q="label:PARSED OR label:PUBLISHED").execute()
     messages = results.get("messages", [])
     for message in messages:
-        reset_labels(service, user_id, message["id"], [GmailLabels.PARSED.value, GmailLabels.PUBLISHED.value])
+        reset_labels(service, user_id, message["id"], ["Label_3076953365604997473", "Label_6126309069161477633"])
 
 def remove_emojis(text):
     emoji_pattern = re.compile(

@@ -149,9 +149,6 @@ def update_blogpost_status(post_id, new_status):
 
     return BlogPostDTO.from_orm(blogpost)
 
-#TODO figure out where changing between string and datetime will be necessary
-#TODO lists aren't allowed in the database, so we need to convert them to strings but also to lists when we retrieve them
-
 def update_blogpost(post_id, blogpost):
     """Update an existing blog post and return the updated blog post."""
     with get_session() as session:

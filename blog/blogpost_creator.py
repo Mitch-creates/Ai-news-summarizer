@@ -317,8 +317,7 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
         }
         NoQuotesForDatesDumper.add_representer(str, NoQuotesForDatesDumper.represent_str)
         NoQuotesForDatesDumper.add_representer(datetime, NoQuotesForDatesDumper.represent_datetime)
-        # TODO add tags to the front matter to have our blog posts searchable
-        
+    
         # Convert front matter to YAML format, width=float('inf') ensures no line breaks
         front_matter_yaml = yaml.dump(front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True, width=float('inf'), Dumper=NoQuotesForDatesDumper)
 
@@ -362,23 +361,3 @@ def format_front_matter_value(value):
     elif value is None:
         return ""  # Handle None values as empty string
     return value  
-
-# TODO Analyse OpenAI's response if it contains everything we need for the blog post
-# TODO If it does, we can proceed to save it in the database
-# TODO If not, we need to refine the prompt or the processing of the emails
-# TODO We can also add more metadata to the prompt to guide the AI better
-# We need the following elements in the response to proceed to create the markdown file:
-#---
-#layout: post
-#title: "Title"
-#subtitle: "Subtitle"
-#date: 2024-01-09
-#author: "AI"
-#image: "No idea what I want here for now. Would be fun if this were an AI-generated image."
-#slug: "Not sure what this is currently"
-#description: "Generated description of the blog post"
-#tags: ["AI", "News"]
-#---
-
-#TODO Another question is if we can't just ask ai to structure this in a specific way so we can parse it easily and afterwards create it like the structure above in the markdown file
-#TODO We can also ask the AI to generate the markdown file directly BUT we need it to format like the whole blogpost with all the html tags

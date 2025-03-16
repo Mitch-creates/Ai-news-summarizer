@@ -9,10 +9,11 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from auth.gmail_auth import authenticate_gmail 
 from database import db_operations
-from email_processing.gmail_interactions import fetch_sunday_emails, fetch_wednesday_emails
+from email_processing.gmail_interactions import apply_label_to_multiple_emails, fetch_sunday_emails, fetch_wednesday_emails, rollback_email_status, rollback_multiple_emails_statuses
 from database.db_operations import initialize_database, insert_email, check_if_email_exists_by_gmail_id
 from entities.Email import Email
 from enums.blogpost_subject import BlogPostSubject
+from enums.gmail_labels import GmailLabels
 from enums.newsletters import Newsletters
 from blog.blogpost_creator import create_blogpost, generate_markdown_file
 from git_processing.git_operations import commit_and_push_all, merge_pull_request
@@ -112,6 +113,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run the AI News Summary script.")
     parser.add_argument("--day", type=str, choices=["Sunday", "Wednesday"], help="Manually specify the day for testing.")
     args = parser.parse_args()
+    emails_to_update_labels = []  # List to track emails for label updates
 
     # Use the argument if provided, otherwise use today's actual day
     today = args.day if args.day else datetime.today().strftime('%A')
@@ -128,7 +130,7 @@ def main():
             active_newsletters = get_active_newsletters(subject)
 
             if not active_newsletters:
-                logging.info(f"No active newsletters added for {subject}. Skipping to next subject.")
+                logging.info(f"No active newsletters added for {subject} or they're not active (bool isn't True). Skipping to next subject.")
                 continue  
 
             emails = fetch_emails_for_today(service, active_newsletters, today)
@@ -139,8 +141,13 @@ def main():
 
             process_emails(emails)
             blogpost = generate_blogpost(emails, subject, today)
-            if blogpost:
+            if blogpost: 
+                apply_label_to_multiple_emails(service, "me", emails, "Label_6126309069161477633") 
+                emails_to_update_labels.extend(emails)  # Add emails to the list for label updates
                 blogposts_to_commit.append(blogpost)
+            else:
+                logging.warning(f"Blog post generation failed for {subject}. Resetting email labels.")
+                rollback_multiple_emails_statuses(service, "me", emails)
 
             logging.info(f"Completed processing blogpost for {subject} newsletters.")
             time.sleep(5)  # Sleep to avoid hitting API limits
@@ -149,6 +156,8 @@ def main():
             logging.info("Committing and pushing all generated blog posts in a single push...")
             pr_number = commit_and_push_all(blogposts_to_commit)
             merge_pull_request(pr_number)
+            apply_label_to_multiple_emails(service, "me", emails_to_update_labels, "Label_3076953365604997473")
+            logging.info(f"Blog posts committed and pushed successfully. PR Number: {pr_number}")
         else:
             logging.info("No blog posts generated. Skipping GitHub commit.")
 
