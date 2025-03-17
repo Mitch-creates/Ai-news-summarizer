@@ -123,6 +123,14 @@ def commit_changes(blogposts):
 
         for blogpost in blogposts:
             file_path = blogpost.markdown_file_path
+
+            if not os.path.exists(file_path):
+                logging.error(f"File not found: {file_path}. Adding a delay...")
+                time.sleep(2)  # Wait for file to be written
+                if not os.path.exists(file_path):
+                    logging.error(f"File STILL missing after delay: {file_path}")
+                    continue  # Skip this file
+
             run_git_command(["git", "add", file_path], blog_repo_path)
 
         commit_message = f"Publish {', '.join(blogpost.blogpost_subject for blogpost in blogposts)} Weekly Blogposts"
