@@ -73,32 +73,30 @@ def fetch_latest_branch():
     try:
         blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
 
-        if check_git_changes(blog_repo_path):
-            logging.info("Uncommitted changes detected! Stashing changes before switching branches.")
-            run_git_command(["git", "stash"], blog_repo_path)
+        if "GITHUB_ACTIONS" in os.environ:  # Only run in GitHub Actions
+            if check_git_changes(blog_repo_path):
+                logging.info("Uncommitted changes detected! Stashing changes before switching branches.")
 
-        # Add this step to handle untracked files before switching branches
-        untracked_files = run_git_command(["git", "ls-files", "--others", "--exclude-standard"], blog_repo_path)
-        if untracked_files:
-            logging.info("Untracked files detected. Adding them before switching branches.")
-            run_git_command(["git", "add", "."], blog_repo_path)
-            run_git_command(["git", "commit", "-m", "Adding untracked files before branch switch"], blog_repo_path)
+                # Add untracked Markdown files before stashing
+                run_git_command(["git", "add", "blog_repo/content/posts/*.md"], blog_repo_path)
+                run_git_command(["git", "stash"], blog_repo_path)
 
         # Now, safely switch to develop
         run_git_command(["git", "checkout", "develop"], blog_repo_path)
         run_git_command(["git", "pull", "origin", "develop"], blog_repo_path)
 
-        # Check if stash exists before popping
-        stash_list = run_git_command(["git", "stash", "list"], blog_repo_path)
-        if stash_list and "stash@{" in stash_list:
-            logging.info("Restoring stashed changes...")
-            stash_result = run_git_command(["git", "stash", "pop"], blog_repo_path)
+        if "GITHUB_ACTIONS" in os.environ:
+            # Check if stash exists before popping
+            stash_list = run_git_command(["git", "stash", "list"], blog_repo_path)
+            if stash_list and "stash@{" in stash_list:
+                logging.info("Restoring stashed changes...")
+                stash_result = run_git_command(["git", "stash", "pop"], blog_repo_path)
 
-            if "conflict" in stash_result.lower():
-                logging.warning("Merge conflict detected in stash pop. Attempting auto-resolution...")
-                run_git_command(["git", "checkout", "--theirs", "."], blog_repo_path)  # Keep latest version
-                run_git_command(["git", "add", "."], blog_repo_path)  # Mark conflicts as resolved
-                run_git_command(["git", "commit", "-m", "Auto-resolved stash conflicts"], blog_repo_path)
+                if "conflict" in stash_result.lower():
+                    logging.warning("Merge conflict detected in stash pop. Attempting auto-resolution...")
+                    run_git_command(["git", "checkout", "--theirs", "."], blog_repo_path)  # Keep latest version
+                    run_git_command(["git", "add", "."], blog_repo_path)  # Mark conflicts as resolved
+                    run_git_command(["git", "commit", "-m", "Auto-resolved stash conflicts"], blog_repo_path)
 
         logging.info("Develop branch is up to date.")
     except Exception as e:
@@ -113,6 +111,10 @@ def commit_changes(blogposts):
             return False
 
         blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
+
+        if "GITHUB_ACTIONS" in os.environ:  # Only in GitHub Actions
+            # Ensure all Markdown files are staged
+            run_git_command(["git", "add", "blog_repo/content/posts/*.md"], blog_repo_path)
 
         # Check if there are conflicts before adding changes
         merge_status = run_git_command(["git", "diff", "--name-only", "--diff-filter=U"], blog_repo_path)
