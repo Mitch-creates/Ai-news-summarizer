@@ -50,6 +50,7 @@ jobs:
           else
             echo "DAY=${{ github.event.inputs.day }}" >> $GITHUB_ENV
           fi
+        shell: bash
 
       - name: Run Newsletter Fetch & Blog Generation
         run: python main.py --day "$DAY"
