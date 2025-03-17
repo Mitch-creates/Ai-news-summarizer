@@ -92,3 +92,9 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## Automatically update the requirements.txt file with the following command
 pipreqs . --force
+or
+pip install -r requirements.txt
+
+## Git Automation workflow
+- Find the workflow in .github/workflows or on github repository under Actions.
+- If you want to trigger the workflow manually git will ask for a day so type: Sunday or Wednesday as our app only works on those days. If you don't type it manually it defaults to the current day
