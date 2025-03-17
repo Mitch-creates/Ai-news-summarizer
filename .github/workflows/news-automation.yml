@@ -62,6 +62,17 @@ jobs:
       - name: Clone Blog Repository
         run: git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ secrets.OWNER }}/News-summary-blog.git blog_repo
 
+      - name: Debug GitHub Actions Working Directory
+        run: |
+          echo "Current Working Directory:"
+          pwd
+          echo "Home Directory Structure:"
+          ls -lah /home/runner/work/
+          echo "Project Directory Structure:"
+          ls -lah /home/runner/work/Ai-news-summarizer/
+          echo "Inside the Cloned Repository:"
+          ls -lah /home/runner/work/Ai-news-summarizer/Ai-news-summarizer/
+
       - name: Run Newsletter Fetch & Blog Generation
         run: python main.py --day "$DAY"
         env:
