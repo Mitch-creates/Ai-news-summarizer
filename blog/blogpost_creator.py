@@ -329,13 +329,23 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
         # Convert front matter to YAML format, width=float('inf') ensures no line breaks
         front_matter_yaml = yaml.dump(front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True, width=float('inf'), Dumper=NoQuotesForDatesDumper)
 
+        logging.info(f"🔹 Current working directory: {os.getcwd()}")
+        logging.info(f"🔹 Target Markdown file path: {filepath}")
+
         # Write Markdown file
         with open(filepath, "w", encoding="utf-8") as file:
             file.write("---\n")
             file.write(front_matter_yaml)
             file.write("---\n\n")
             file.write(blogpostDTO.content)
+            file.flush()  # Ensures immediate writing to the file
+            os.fsync(file.fileno())  # Forces writing to disk
         logging.info(f"Markdown file created successfully at {filepath}")
+
+        if os.path.exists(filepath):
+            logging.info(f"✅ Successfully verified Markdown file exists: {filepath}")
+        else:
+            logging.error(f"❌ Markdown file NOT FOUND after writing: {filepath}")
 
         # Update the file path in the BlogPostDTO object
         blogpostDTO.markdown_file_path = filepath
