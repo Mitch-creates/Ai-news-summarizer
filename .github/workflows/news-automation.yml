@@ -28,6 +28,20 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Set Environment Variables
+        run: |
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+          echo "GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}" >> $GITHUB_ENV
+          echo "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}" >> $GITHUB_ENV
+          echo "GH_TOKEN=${{ secrets.GH_TOKEN }}" >> $GITHUB_ENV
+          echo "BLOG_REPOSITORY_URL_HTTPS=${{ secrets.BLOG_REPOSITORY_URL_HTTPS }}" >> $GITHUB_ENV
+          echo "BLOG_REPOSITORY_PATH=${{ secrets.BLOG_REPOSITORY_PATH }}" >> $GITHUB_ENV
+          echo "OWNER=${{ secrets.OWNER }}" >> $GITHUB_ENV
+          echo "OWNER_EMAIL=${{ secrets.OWNER_EMAIL }}" >> $GITHUB_ENV
+          echo "REPO_NAME=${{ secrets.REPO_NAME }}" >> $GITHUB_ENV
+  
+
       - name: Determine Execution Day
         id: set_day
         run: |
@@ -41,6 +55,16 @@ jobs:
         run: python main.py --day "$DAY"
         env:
           DAY: ${{ env.DAY }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+          GMAIL_EMAIL: ${{ env.GMAIL_EMAIL }}
+          OPENAI_MODEL: ${{ env.OPENAI_MODEL }}
+          GH_TOKEN: ${{ env.GH_TOKEN }}
+          BLOG_REPOSITORY_URL_HTTPS: ${{ env.BLOG_REPOSITORY_URL_HTTPS }}
+          BLOG_REPOSITORY_PATH: ${{ env.BLOG_REPOSITORY_PATH }}
+          OWNER: ${{ env.OWNER }}
+          OWNER_EMAIL: ${{ env.OWNER_EMAIL }}
+          REPO_NAME: ${{ env.REPO_NAME }}
 
       - name: Commit and Push Changes
         run: |
