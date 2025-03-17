@@ -38,7 +38,9 @@ jobs:
           fi
 
       - name: Run Newsletter Fetch & Blog Generation
-        run: python main.py --day ${{ env.DAY }}
+        run: python main.py --day "$DAY"
+        env:
+          DAY: ${{ env.DAY }}
 
       - name: Commit and Push Changes
         run: |
@@ -47,3 +49,5 @@ jobs:
           git add .
           git commit -m "Automated News Summary for $DAY" || echo "No changes to commit"
           git push
+        env:
+          DAY: ${{ env.DAY }}
