@@ -293,9 +293,16 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
     try:
         # Get the current directory of the script
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        REPO_NAME = os.getenv("REPO_NAME")
+
+        if "GITHUB_ACTIONS" in os.environ:
+            logging.info("Running in GitHub Actions environment.")
+            blog_repo_path = os.path.join(os.getcwd(), "blog_repo")
+        else:
+            logging.info("Running in local environment.")
+            blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH", "C:\\Users\\michi\\Projects\\News-summary-blog")
+
         # Construct the relative path to the target directory
-        target_dir = os.path.join(current_dir, f'../../{REPO_NAME}/content/posts')
+        target_dir = os.path.join(blog_repo_path, "content/posts")
         target_dir = os.path.abspath(target_dir)  # Ensure absolute path
 
         # Define filename
@@ -327,6 +334,7 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
             file.write(front_matter_yaml)
             file.write("---\n\n")
             file.write(blogpostDTO.content)
+        logging.info(f"Markdown file created successfully at {filepath}")
 
         # Update the file path in the BlogPostDTO object
         blogpostDTO.markdown_file_path = filepath

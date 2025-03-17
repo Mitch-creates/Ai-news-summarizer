@@ -59,6 +59,9 @@ jobs:
           fi
         shell: bash
 
+      - name: Clone Blog Repository
+        run: git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ secrets.OWNER }}/News-summary-blog.git blog_repo
+
       - name: Run Newsletter Fetch & Blog Generation
         run: python main.py --day "$DAY"
         env:
@@ -69,7 +72,7 @@ jobs:
           OPENAI_MODEL: ${{ env.OPENAI_MODEL }}
           GH_TOKEN: ${{ env.GH_TOKEN }}
           BLOG_REPOSITORY_URL_HTTPS: ${{ env.BLOG_REPOSITORY_URL_HTTPS }}
-          BLOG_REPOSITORY_PATH: ${{ env.BLOG_REPOSITORY_PATH }}
+          BLOG_REPOSITORY_PATH: ${{ github.workspace }}/blog_repo
           OWNER: ${{ env.OWNER }}
           OWNER_EMAIL: ${{ env.OWNER_EMAIL }}
           REPO_NAME: ${{ env.REPO_NAME }}
@@ -78,8 +81,9 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
+          git add -f *.db
           git add .
           git commit -m "Automated News Summary for $DAY" || echo "No changes to commit"
-          git push
+          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
         env:
           DAY: ${{ env.DAY }}
