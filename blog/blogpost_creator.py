@@ -296,7 +296,7 @@ def generate_markdown_file(blogpostDTO: BlogPostDTO) -> BlogPostDTO:
 
         if "GITHUB_ACTIONS" in os.environ:
             logging.info("Running in GitHub Actions environment.")
-            blog_repo_path = os.path.join(os.getcwd(), "blog_repo")
+            blog_repo_path = os.path.abspath(os.path.join(os.getenv("GITHUB_WORKSPACE", os.getcwd()), "blog_repo"))
         else:
             logging.info("Running in local environment.")
             blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH", "C:\\Users\\michi\\Projects\\News-summary-blog")
