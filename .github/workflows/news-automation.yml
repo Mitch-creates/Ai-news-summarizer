@@ -94,14 +94,15 @@ jobs:
         run: |
           if [ -d "blog_repo/.git" ]; then
             echo "Removing blog_repo as a submodule..."
-            git rm --cached blog_repo
-            rm -rf .git/modules/blog_repo
-            rm -rf blog_repo
+            git submodule deinit -f blog_repo || echo "No submodule to deinit"
+            git rm --cached blog_repo || echo "No submodule to remove"
+            rm -rf .git/modules/blog_repo || echo "No module metadata to remove"
+            rm -rf blog_repo || echo "No blog_repo directory to remove"
             mkdir blog_repo
           else
-            echo "blog_repo is not a submodule. Skipping removal."
+            echo "blog_repo is not a submodule or is already removed. Skipping."
           fi
-
+        
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Actions"
