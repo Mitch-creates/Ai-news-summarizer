@@ -40,7 +40,14 @@ jobs:
           echo "OWNER=${{ secrets.OWNER }}" >> $GITHUB_ENV
           echo "OWNER_EMAIL=${{ secrets.OWNER_EMAIL }}" >> $GITHUB_ENV
           echo "REPO_NAME=${{ secrets.REPO_NAME }}" >> $GITHUB_ENV
+      
+      - name: Create credentials.json
+        run: |
+          echo "${{ secrets.GMAIL_CREDENTIALS_JSON }}" | base64 --decode > credentials.json
   
+      - name: Restore token.pickle
+        run: |
+          echo "${{ secrets.GMAIL_TOKEN_PICKLE }}" | base64 --decode > token.pickle
 
       - name: Determine Execution Day
         id: set_day
