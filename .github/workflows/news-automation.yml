@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set Up Python
         uses: actions/setup-python@v4
@@ -87,6 +89,18 @@ jobs:
           OWNER: ${{ env.OWNER }}
           OWNER_EMAIL: ${{ env.OWNER_EMAIL }}
           REPO_NAME: ${{ env.REPO_NAME }}
+
+      - name: Fix Git Submodule Issue (Remove `blog_repo` if it's a submodule)
+        run: |
+          if [ -d "blog_repo/.git" ]; then
+            echo "Removing blog_repo as a submodule..."
+            git rm --cached blog_repo
+            rm -rf .git/modules/blog_repo
+            rm -rf blog_repo
+            mkdir blog_repo
+          else
+            echo "blog_repo is not a submodule. Skipping removal."
+          fi
 
       - name: Commit and Push Changes
         run: |
