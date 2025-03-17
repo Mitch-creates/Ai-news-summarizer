@@ -159,7 +159,7 @@ def rollback_email_status(service, user_id, email):
     email_id = email.gmail_id
     reset_labels(service, user_id, email_id, ["Label_3076953365604997473", "Label_6126309069161477633"])
     mark_email_as_unread(service, user_id, email_id)
-    print(f"Email {email_id} rolled back to READ status.")
+    print(f"Email {email_id} rolled back to UNREAD status.")
 
 def rollback_multiple_emails_statuses(service, user_id, emails):
     """Resets labels for multiple emails if blog posts are not created successfully."""
