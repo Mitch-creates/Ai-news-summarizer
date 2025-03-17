@@ -6,9 +6,11 @@ from enums.blogpost_subject import BlogPostSubject
 
 class Newsletters(PyEnum):
     BENSBITES = ("bensbites@mail.bensbites.co", False, BlogPostSubject.AI)
-    THERUNDOWN = ("news@daily.therundown.ai", False, BlogPostSubject.AI)
+    THERUNDOWN = ("news@daily.therundown.ai", True, BlogPostSubject.AI)
     TLDR = ("dan@tldrnewsletter.com", True, BlogPostSubject.AI)
     TECHCRUNCH = ('newsletters@techcrunch.com', True, BlogPostSubject.TECH)
+    THEDOWNLOAD = ('newsletters@technologyreview.com', True, BlogPostSubject.TECH)
+
 
     def __init__(self, email, active, subject: BlogPostSubject):
         self._email = email
