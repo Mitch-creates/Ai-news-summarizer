@@ -40,7 +40,7 @@ def setup_git():
     """Configures Git user credentials and authentication."""
     try:
         blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
-        GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+        GH_TOKEN = os.getenv("GH_TOKEN")
         repo_url = os.getenv("BLOG_REPOSITORY_URL_HTTPS")
         OWNER = os.getenv("OWNER")
         OWNER_EMAIL = os.getenv("OWNER_EMAIL")
@@ -48,7 +48,7 @@ def setup_git():
         run_git_command(["git", "config", "--global", "user.name", OWNER], blog_repo_path)
         run_git_command(["git", "config", "--global", "user.email", OWNER_EMAIL], blog_repo_path)
 
-        repo_url_with_token = repo_url.replace("https://", f"https://{GITHUB_TOKEN}@")
+        repo_url_with_token = repo_url.replace("https://", f"https://{GH_TOKEN}@")
         run_git_command(["git", "remote", "set-url", "origin", repo_url_with_token], blog_repo_path)
 
         logging.info("Git authentication setup complete.")
@@ -153,10 +153,10 @@ def check_existing_pr():
     try:
         OWNER = os.getenv("OWNER")
         REPO = os.getenv("REPO_NAME")
-        GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+        GH_TOKEN = os.getenv("GH_TOKEN")
 
         api_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls?state=open"
-        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
         response = requests.get(api_url, headers=headers)
         if response.status_code != 200:
@@ -177,10 +177,10 @@ def create_pull_request():
     try:
         OWNER = os.getenv("OWNER")
         REPO = os.getenv("REPO_NAME")
-        GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+        GH_TOKEN = os.getenv("GH_TOKEN")
 
         api_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls"
-        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         payload = {
             "title": "Automated Blogpost Updates",
             "head": "develop",
@@ -234,11 +234,11 @@ def merge_pull_request(pr_number):
 
     REPO = os.getenv("REPO_NAME")
     OWNER = os.getenv("OWNER")
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+    GH_TOKEN = os.getenv("GH_TOKEN")
     blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
 
     pr_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{pr_number}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
     # Wait for GitHub to calculate mergeability
     attempts = 0
@@ -298,7 +298,7 @@ def merge_pull_request(pr_number):
 #     file_path = BlogpostDTO.markdown_file_path
 #     commit_message = f"Publish new AI Weekly Summary blogpost: {slug}"
 
-#     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+#     GH_TOKEN = os.getenv("GH_TOKEN")
 #     repo_url = os.getenv("BLOG_REPOSITORY_URL_HTTPS")
 #     blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
 #     OWNER = os.getenv("OWNER")
@@ -308,7 +308,7 @@ def merge_pull_request(pr_number):
 #     run_git_command(['git', 'config', '--global', 'user.name', OWNER], blog_repo_path)
 #     run_git_command(['git', 'config', '--global', 'user.email', OWNER_EMAIL], blog_repo_path)
 
-#     repo_url_with_token = repo_url.replace("https://", f"https://{GITHUB_TOKEN}@")
+#     repo_url_with_token = repo_url.replace("https://", f"https://{GH_TOKEN}@")
 #     run_git_command(['git', 'remote', 'set-url', 'origin', repo_url_with_token], blog_repo_path)
 
 #     # Stash any local changes before switching branches
@@ -345,10 +345,10 @@ def merge_pull_request(pr_number):
 #     """Checks if there's already an open PR from `develop` to `master`."""
 #     OWNER = os.getenv("OWNER")
 #     REPO = os.getenv("REPO_NAME")
-#     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+#     GH_TOKEN = os.getenv("GH_TOKEN")
 
 #     api_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls?state=open"
-#     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+#     headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
 #     response = requests.get(api_url, headers=headers)
 #     if response.status_code != 200:
@@ -365,10 +365,10 @@ def merge_pull_request(pr_number):
 #     """Creates a new PR from `develop` to `master`."""
 #     OWNER = os.getenv("OWNER")
 #     REPO = os.getenv("REPO_NAME")
-#     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+#     GH_TOKEN = os.getenv("H_TOKEN")
 
 #     api_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls"
-#     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+#     headers = {"Authorization": f"token {H_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 #     payload = {
 #         "title": f"Merge develop into master - {slug}",
 #         "head": "develop",
@@ -393,11 +393,11 @@ def merge_pull_request(pr_number):
 
 #     REPO = os.getenv("REPO_NAME")
 #     OWNER = os.getenv("OWNER")
-#     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+#     GH_TOKEN = os.getenv("GH_TOKEN")
 #     blog_repo_path = os.getenv("BLOG_REPOSITORY_PATH")
 
 #     pr_url = f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{pr_number}"
-#     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+#     headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
 #     pr_response = requests.get(pr_url, headers=headers)
 #     pr_data = pr_response.json()
